@@ -1,1 +1,12 @@
+.venv/
 CLAUDE.md
+discoveryguy/src/__pycache__/
+discoveryguy/src/discoveryguy/__pycache__/
+libs/analysis-graph/build/
+libs/analysis-graph/src/analysis_graph/__pycache__/
+libs/analysis-graph/src/shellphish_analysis_graph.egg-info/
+libs/crs-telemetry/build/
+libs/crs-telemetry/src/crs_telemetry.egg-info/
+libs/crs-telemetry/src/crs_telemetry/__pycache__/
+libs/libcodeql/build/
+libs/libcodeql/src/libcodeql.egg-info/
