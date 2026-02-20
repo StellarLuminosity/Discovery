@@ -1,6 +1,5 @@
 import subprocess
 import os
-import fuzzing
 import random
 import logging
 

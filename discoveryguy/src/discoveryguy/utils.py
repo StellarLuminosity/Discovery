@@ -22,9 +22,7 @@ from analysis_graph.models.harness_inputs import HarnessInputNode
 from pathlib import Path
 from functools import reduce
 
-from discoveryguy.config import Config, DiscoverGuyMode, CRSMode
-
-from .config import Config
+from .config import Config, DiscoverGuyMode, CRSMode
 
 log = logging.getLogger("discoveryguy.utils")
 logger = log
