@@ -1,5 +1,0 @@
-agentlib: true
-test-data:
-  quickseed/targets:
-    dest: tests/targets
-    extract_tars: true

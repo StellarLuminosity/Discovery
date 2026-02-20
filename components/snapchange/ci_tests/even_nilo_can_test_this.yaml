@@ -1,5 +1,0 @@
-test-data:
-  backups/snapchange/:
-    dest: backups/
-    extract_tars: true
-runner: ['self-hosted', 'longrun']

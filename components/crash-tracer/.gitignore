@@ -1,3 +1,0 @@
-pipeline.lock
-__pycache__/
-ci_tests/test_oss_fuzz_reports

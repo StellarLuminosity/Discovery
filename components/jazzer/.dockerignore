@@ -1,7 +1,0 @@
-!dist/
-__pycache__
-*.egg-info
-build
-pipeline.lock
-pipeline.yaml
-.git/

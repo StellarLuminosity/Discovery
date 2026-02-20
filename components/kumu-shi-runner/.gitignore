@@ -1,6 +1,0 @@
-patchery.egg-info/
-__pycache__/
-tests/aicc_testing
-tests/tmp
-artiphishell-tests-data/
-*.ql

@@ -1,2 +1,0 @@
-test-data:
-  oss-fuzz-crash-parsing/test_run_pov_results: "ci_tests/test_oss_fuzz_reports/test_run_pov_results"

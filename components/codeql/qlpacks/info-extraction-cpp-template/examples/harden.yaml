@@ -1,3 +1,0 @@
-target_functions:
-  - core_sys_select
-  - put_itimerval

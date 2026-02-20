@@ -1,3 +1,0 @@
-include cwe-details.csv
-include serve_model.sh
-recursive-include model_zoo *

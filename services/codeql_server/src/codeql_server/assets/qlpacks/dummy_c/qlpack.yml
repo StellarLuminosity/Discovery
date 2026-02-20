@@ -1,7 +1,0 @@
----
-library: false 
-warnOnImplicitThis: false
-name: dummy-c
-version: 0.0.1
-dependencies:
-  codeql/cpp-all: "*"

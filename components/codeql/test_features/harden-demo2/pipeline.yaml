@@ -1,6 +1,0 @@
-repo_classes: {}
-
-imports:
-  codeql:
-    path: ../../pipeline.yaml
-    repos: {}

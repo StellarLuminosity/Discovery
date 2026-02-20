@@ -1,6 +1,0 @@
-repo_classes: {}
-
-imports:
-  invguy:
-    path: ../../pipeline.yaml
-    repos: {}

@@ -1,6 +1,0 @@
-MATCH (h:HarnessInputNode), (f:CFGFunction), (g:Grammar)
-WHERE id(h) = 4291 AND id(f) = 23 AND id(g) = 4540
-MERGE (h)-[:COVERS]->(f)
-MERGE (g)-[:COVERS]->(f)
-RETURN f, h, g
-

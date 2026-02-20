@@ -1,4 +1,0 @@
-test-data:
-  backups/poiguy/:
-    dest: backups/
-    extract_tars: true

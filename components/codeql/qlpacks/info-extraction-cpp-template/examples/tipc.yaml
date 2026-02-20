@@ -1,2 +1,0 @@
-target_functions:
-  - tipc_crypto_key_recv

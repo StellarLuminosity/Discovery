@@ -1,2 +1,0 @@
-
-from .Detector import DetectorGuy

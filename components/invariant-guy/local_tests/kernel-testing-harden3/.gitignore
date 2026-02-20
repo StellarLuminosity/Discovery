@@ -1,5 +1,0 @@
-targets-semis-harden-demo3-cp/
-pipeline.lock
-*.tar.gz
-
-!backup/**
