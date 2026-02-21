@@ -1245,7 +1245,7 @@ class Agent(RunnableLocalObject[Input, Output]):
         self.executor = ExceptionHandlingAgentExecutor(
             agent=agent,
             tools=av_tools,
-            verbose=True,
+            verbose=False,
             stream_runnable=False,
             handle_parsing_errors=True,
             max_iterations=self.__MAX_TOOL_ITERATIONS__ or 15,
