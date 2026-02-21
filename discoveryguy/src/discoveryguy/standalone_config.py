@@ -65,7 +65,27 @@ class StandaloneConfig:
 
 
 ACTIVE_CONFIG = StandaloneConfig(
-    target=StandaloneTargetConfig(),
-    io=StandaloneIOConfig(),
-    runtime=StandaloneRuntimeConfig(),
+    target=StandaloneTargetConfig(
+        project_id="dvcp-local",
+        dg_id="1",
+        project_language="c",
+        source_dir="/home/mark/Projects/Damn_Vulnerable_C_Program",
+        build_command="gcc -g -O0 -fsanitize=address,undefined -fno-omit-frame-pointer -o dvcp dvcp.c",
+        run_command="./dvcp {input}",
+        harness_name="dvcp",
+        harness_function_name="main",
+        harness_source_path="/home/mark/Projects/Damn_Vulnerable_C_Program/dvcp.c",
+    ),
+    io=StandaloneIOConfig(
+        target_metadata="/home/mark/Projects/Discovery/discoveryguy/local_artifacts/dvcp/target_metadata.yaml",
+        functions_by_file_index="/home/mark/Projects/Discovery/discoveryguy/local_artifacts/dvcp/functions_by_file_index.json",
+        function_index="/home/mark/Projects/Discovery/discoveryguy/local_artifacts/dvcp/function_index.json",
+        target_functions_jsons_dir="/home/mark/Projects/Discovery/discoveryguy/local_artifacts/dvcp/functions_jsons",
+        function_ranking="/home/mark/Projects/Discovery/discoveryguy/local_artifacts/dvcp/function_ranking.yaml",
+    ),
+    runtime=StandaloneRuntimeConfig(
+        mode="POIS",
+        local_run=True,
+        use_codeql_server=False,
+    ),
 )
