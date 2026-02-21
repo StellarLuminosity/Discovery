@@ -10,6 +10,7 @@ from ..paths import CODEQL_TEMPLATES_ROOT
 
 import yaml
 import os
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -94,22 +95,31 @@ class CodeQlSkill:
         self.client = None
         if self.local_run:
             codeql_db_path = kwargs.get('codeql_db_path', None)
-            if codeql_db_path is None:
-                raise ValueError("codeql_db_path is not found ❌")  
             self.client = CodeQLClient()
-            print("Uploading codeql db 🚀")
-            # We are uploading the codeql server ourselves
-            try:
-                self.client.upload_db(self.project_name, self.project_id, self.project_language, codeql_db_path)
-                print("Codeql db uploaded successfully 🎉")
-            except Exception as e:
-                
-                if 'already exists' in str(e.args):
-                    print("Codeql db already exists, skipping upload")
-                else:
-                    print("Error uploading codeql db ❌")
-                    print(f"Error uploading codeql db: {e}")
-                    raise ValueError("codeql_db_path is not found ❌")
+            if codeql_db_path:
+                upload_db_file = self._resolve_codeql_db_file(codeql_db_path)
+                print("Uploading codeql db 🚀")
+                # We are uploading the codeql server ourselves
+                try:
+                    self.client.upload_db(
+                        self.project_name,
+                        self.project_id,
+                        self.project_language,
+                        upload_db_file,
+                    )
+                    print("Codeql db uploaded successfully 🎉")
+                except Exception as e:
+
+                    if 'already exists' in str(e.args):
+                        print("Codeql db already exists, skipping upload")
+                    else:
+                        print("Error uploading codeql db ❌")
+                        print(f"Error uploading codeql db: {e}")
+                        raise ValueError("codeql_db_path is invalid ❌")
+            else:
+                logger.info(
+                    "CodeQL enabled with no local DB upload path; assuming DB already exists on server."
+                )
             
         else:
             self.client = CodeQLClient()
@@ -130,6 +140,36 @@ class CodeQlSkill:
         # Finally, setting the global variable
         global GlobalCodeQlSkill
         GlobalCodeQlSkill = self
+
+    @staticmethod
+    def _resolve_codeql_db_file(codeql_db_path: str) -> str:
+        """
+        Accept either:
+        - direct path to a .zip/.tar.gz CodeQL db archive
+        - directory containing sss-codeql-database.zip
+        - directory containing exactly one .zip archive
+        """
+        path = Path(codeql_db_path)
+        if not path.exists():
+            raise ValueError(f"codeql_db_path does not exist: {codeql_db_path}")
+        if path.is_file():
+            return str(path)
+
+        candidates = []
+        default_zip = path / "sss-codeql-database.zip"
+        if default_zip.exists():
+            return str(default_zip)
+        candidates.extend(path.glob("*.zip"))
+        candidates.extend(path.glob("*.tar.gz"))
+        if len(candidates) == 1:
+            return str(candidates[0])
+        if len(candidates) == 0:
+            raise ValueError(
+                f"No CodeQL DB archive found in directory: {codeql_db_path}"
+            )
+        raise ValueError(
+            f"Multiple CodeQL DB archives found in {codeql_db_path}; please provide an explicit file path."
+        )
         
     def get_struct_definition(self, structure_name: str) -> str:
 
