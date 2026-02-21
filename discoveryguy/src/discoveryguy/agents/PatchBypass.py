@@ -2,11 +2,14 @@
 import logging
 import re
 from agentlib import LocalObject, ObjectParser, Field, tools, LLMFunction
+from typing import Optional, Any, List, Dict
 from agentlib import AgentWithHistory, LocalObject, ObjectParser, Field, tools, Agent
 from agentlib.lib.common.parsers import BaseParser
 
 from ..toolbox.peek_src_dumb import show_file_at_simple, lookup_symbol_simple
-from typing import Optional, Any
+from ..paths import PROMPTS_ROOT as _PROMPTS_ROOT
+
+PROMPTS_ROOT = str(_PROMPTS_ROOT)
 
 logger = logging.getLogger('PatchBypassGuy')
 # Bypass metadata is going to contain the following:
@@ -17,7 +20,7 @@ logger = logging.getLogger('PatchBypassGuy')
 
 class MyParser(BaseParser):
     recover_with = 'gpt-o4-mini'
-    __OUTPUT_DESCRIPTION = '/src/discoveryguy/prompts/PatchBypass/BypassGuyReport.txt'
+    __OUTPUT_DESCRIPTION = f'{PROMPTS_ROOT}/PatchBypass/BypassGuyReport.txt'
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.patch_bypass = kwargs.get('patch_bypass')
@@ -85,8 +88,8 @@ class PatchBypass(AgentWithHistory[dict,str]):
     # Lets keep it simple for now
     __MAX_TOOL_ITERATIONS__ = 50
 
-    __SYSTEM_PROMPT_TEMPLATE__ = '/src/discoveryguy/prompts/PatchBypass/system.j2'
-    __USER_PROMPT_TEMPLATE__ = '/src/discoveryguy/prompts/PatchBypass/user.j2'
+    __SYSTEM_PROMPT_TEMPLATE__ = f'{PROMPTS_ROOT}/PatchBypass/system.j2'
+    __USER_PROMPT_TEMPLATE__ = f'{PROMPTS_ROOT}/PatchBypass/user.j2'
 
     __RAISE_ON_BUDGET_EXCEPTION__ = True
     

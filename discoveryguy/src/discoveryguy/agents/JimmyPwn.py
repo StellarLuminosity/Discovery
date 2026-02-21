@@ -1,6 +1,7 @@
 import logging
 import re
 from agentlib import LocalObject, ObjectParser, Field, tools, LLMFunction, SaveLoadObject
+from typing import Optional, Any, List, Dict
 from agentlib import AgentWithHistory, LocalObject, ObjectParser, Field, tools, Agent
 from agentlib.lib.common.parsers import BaseParser
 
@@ -8,7 +9,9 @@ from ..toolbox.peek_src import get_functions_by_file, show_file_at
 from ..toolbox.peek_dbg import check_coverage_for, check_value_of_variable_at
 from ..toolbox import lookup_symbol
 from ..toolbox.code_ql_ops import get_function_callers, get_struct_definition, get_struct_definition_location
-from typing import Optional, Any
+from ..paths import PROMPTS_ROOT as _PROMPTS_ROOT
+
+PROMPTS_ROOT = str(_PROMPTS_ROOT)
 
 logger = logging.getLogger('ExploitDeveloper')
 
@@ -17,7 +20,7 @@ class SeedParser(BaseParser):
     recover_with = 'gpt-o4-mini'
     # recover_with = 'claude-4-sonnet'
     # This is the output format that describes the output of triageGuy
-    __OUTPUT_DESCRIPTION = '/src/discoveryguy/prompts/JimmyPwn/SeedGenerator.output.txt'
+    __OUTPUT_DESCRIPTION = f'{PROMPTS_ROOT}/JimmyPwn/SeedGenerator.output.txt'
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -32,7 +35,7 @@ class SeedParser(BaseParser):
             suffix = "c"
         else:
             suffix = "java"
-        patch_report_template = open(f'/src/discoveryguy/prompts/JimmyPwn/extras-lang/exploits_reports/report.{suffix}', 'r').read()
+        patch_report_template = open(f'{PROMPTS_ROOT}/JimmyPwn/extras-lang/exploits_reports/report.{suffix}', 'r').read()
         output_format = output_format.replace('<PLACEHOLDER_FOR_EXAMPLE_REPORTS_BY_LANGUAGE>', patch_report_template)
         return output_format
 
@@ -95,7 +98,7 @@ class MyParser(BaseParser):
     # recover_with = 'claude-4-sonnet'
     recover_with = "gpt-o4-mini"
     # This is the output format that describes the output of triageGuy
-    __OUTPUT_DESCRIPTION = '/src/discoveryguy/prompts/JimmyPwn/JimmyPwn.output.txt'
+    __OUTPUT_DESCRIPTION = f'{PROMPTS_ROOT}/JimmyPwn/JimmyPwn.output.txt'
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -152,8 +155,8 @@ class SeedGenerationModel(AgentWithHistory[dict, str]):
     # __LLM_MODEL__ = "gpt-4.1"
     __LLM_MODEL__ = "gpt-o4-mini"
     # __LLM_MODEL__ = "gpt-o3"
-    __SYSTEM_PROMPT_TEMPLATE__ = "/src/discoveryguy/prompts/JimmyPwn/seed.system.j2"
-    __USER_PROMPT_TEMPLATE__ = "/src/discoveryguy/prompts/JimmyPwn/seed.user.j2"
+    __SYSTEM_PROMPT_TEMPLATE__ = f"{PROMPTS_ROOT}/JimmyPwn/seed.system.j2"
+    __USER_PROMPT_TEMPLATE__ = f"{PROMPTS_ROOT}/JimmyPwn/seed.user.j2"
     __RETRIES_ON_TOOL_VALIDATION_ERROR__ = 5
 
     __RAISE_ON_BUDGET_EXCEPTION__ = True
@@ -213,8 +216,8 @@ class JimmyPwn(AgentWithHistory[dict, str]):
         'max_tokens': 10240,
     }
 
-    __SYSTEM_PROMPT_TEMPLATE__ = "/src/discoveryguy/prompts/JimmyPwn/system.j2"
-    __USER_PROMPT_TEMPLATE__ = "/src/discoveryguy/prompts/JimmyPwn/user.j2"
+    __SYSTEM_PROMPT_TEMPLATE__ = f"{PROMPTS_ROOT}/JimmyPwn/system.j2"
+    __USER_PROMPT_TEMPLATE__ = f"{PROMPTS_ROOT}/JimmyPwn/user.j2"
 
     __MAX_TOOL_ITERATIONS__ = 75
     __RETRIES_ON_TOOL_VALIDATION_ERROR__ = 8
@@ -316,7 +319,7 @@ class HoneyListParser(BaseParser):
     # recover_with = 'claude-4-sonnet'
     recover_with = "gpt-o4-mini"
     # This is the output format that describes the output of triageGuy
-    __OUTPUT_DESCRIPTION = '/src/discoveryguy/prompts/JimmyPwn/HarnessList.output.txt'
+    __OUTPUT_DESCRIPTION = f'{PROMPTS_ROOT}/JimmyPwn/HarnessList.output.txt'
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -382,8 +385,8 @@ class HoneySelectAgent(Agent[dict, str]):
     __LLM_MODEL__ = "claude-4-sonnet"
     # __LLM_MODEL__ = "gpt-4o-mini"
 
-    __SYSTEM_PROMPT_TEMPLATE__ = "/src/discoveryguy/prompts/JimmyPwn/harness.system.j2"
-    __USER_PROMPT_TEMPLATE__ = "/src/discoveryguy/prompts/JimmyPwn/harness.user.j2"
+    __SYSTEM_PROMPT_TEMPLATE__ = f"{PROMPTS_ROOT}/JimmyPwn/harness.system.j2"
+    __USER_PROMPT_TEMPLATE__ = f"{PROMPTS_ROOT}/JimmyPwn/harness.user.j2"
 
     __RAISE_ON_BUDGET_EXCEPTION__ = True
     __RAISE_ON_RATE_LIMIT_EXCEPTION__ = True
@@ -431,8 +434,8 @@ class SummaryAgent(Agent[dict,str]):
     __LLM_MODEL__ = "claude-4-sonnet"
     __RAISE_ON_BUDGET_EXCEPTION__ = True
     __RAISE_ON_RATE_LIMIT_EXCEPTION__ = True
-    __SYSTEM_PROMPT_TEMPLATE__ = "/src/discoveryguy/prompts/JimmyPwn/summary.system.j2"
-    __USER_PROMPT_TEMPLATE__ = "/src/discoveryguy/prompts/JimmyPwn/summary.user.j2"
+    __SYSTEM_PROMPT_TEMPLATE__ = f"{PROMPTS_ROOT}/JimmyPwn/summary.system.j2"
+    __USER_PROMPT_TEMPLATE__ = f"{PROMPTS_ROOT}/JimmyPwn/summary.user.j2"
 
 
     LANGUAGE_EXPERTISE : str = None

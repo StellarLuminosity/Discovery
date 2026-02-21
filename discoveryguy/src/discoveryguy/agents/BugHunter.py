@@ -2,10 +2,13 @@ import logging
 import re
 
 from agentlib import LocalObject, ObjectParser, Field, tools, LLMFunction
+from typing import Optional, Any, List, Dict
 from agentlib.lib.agents import AgentWithHistory
 from agentlib.lib.common.parsers import BaseParser
 from langchain_core.output_parsers import PydanticOutputParser
-from typing import Optional, Any, List, Dict
+from ..paths import PROMPTS_ROOT as _PROMPTS_ROOT
+
+PROMPTS_ROOT = str(_PROMPTS_ROOT)
 
 from ..toolbox.peek_src import get_functions_by_file, show_file_at
 
@@ -22,7 +25,7 @@ class MyParser(BaseParser):
     recover_with = 'gpt-4o-mini'
 
     # This is the output format that describes the output of triageGuy
-    __OUTPUT_DESCRIPTION = '/src/discoveryguy/prompts/BugHunter/BugHunter.output.txt'
+    __OUTPUT_DESCRIPTION = f'{PROMPTS_ROOT}/BugHunter/BugHunter.output.txt'
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -33,7 +36,7 @@ class MyParser(BaseParser):
         output_format = open(self.__OUTPUT_DESCRIPTION, 'r').read()
         current_language = self.bug_hunter.LANGUAGE_EXPERTISE
         # Let's template the report example based on the current language
-        patch_report_template = open(f'/src/discoveryguy/prompts/BugHunter/extras-lang/warning_reports/report.{current_language}', 'r').read()
+        patch_report_template = open(f'{PROMPTS_ROOT}/BugHunter/extras-lang/warning_reports/report.{current_language}', 'r').read()
         output_format = output_format.replace('<PLACEHOLDER_FOR_EXAMPLE_REPORTS_BY_LANGUAGE>', patch_report_template)
         return output_format
 
@@ -116,8 +119,8 @@ class BugHunter(AgentWithHistory[dict,str]):
     __OUTPUT_PARSER__ = MyParser
     __MAX_TOOL_ITERATIONS__ = 30
 
-    __SYSTEM_PROMPT_TEMPLATE__ = '/src/discoveryguy/prompts/BugHunter/system.j2'
-    __USER_PROMPT_TEMPLATE__ = '/src/discoveryguy/prompts/BugHunter/user.j2'
+    __SYSTEM_PROMPT_TEMPLATE__ = f'{PROMPTS_ROOT}/BugHunter/system.j2'
+    __USER_PROMPT_TEMPLATE__ = f'{PROMPTS_ROOT}/BugHunter/user.j2'
 
     LANGUAGE_EXPERTISE: Optional[str]
     PROJECT_NAME: Optional[str]

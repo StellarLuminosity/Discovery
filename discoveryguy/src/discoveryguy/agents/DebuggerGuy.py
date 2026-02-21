@@ -3,11 +3,14 @@
 import logging
 import re
 from agentlib import LocalObject, ObjectParser, Field, tools, LLMFunction
+from typing import Optional, Any, List, Dict
 from agentlib import AgentWithHistory, LocalObject, ObjectParser, Field, tools
 from agentlib.lib.common.parsers import BaseParser
 
 from ..toolbox.peek_src import get_functions_by_file, show_file_at
-from typing import Optional, Any
+from ..paths import PROMPTS_ROOT as _PROMPTS_ROOT
+
+PROMPTS_ROOT = str(_PROMPTS_ROOT)
 
 logger = logging.getLogger('DebuggerGuy')
 
@@ -24,7 +27,7 @@ class MyParser(BaseParser):
     recover_with = 'gpt-4o-mini'
 
     # This is the output format that describes the output of triageGuy
-    __OUTPUT_DESCRIPTION = '/src/discoveryguy/prompts/DebuggerGuy/DebuggerGuy.output.txt'
+    __OUTPUT_DESCRIPTION = f'{PROMPTS_ROOT}/DebuggerGuy/DebuggerGuy.output.txt'
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -35,7 +38,7 @@ class MyParser(BaseParser):
         output_format = open(self.__OUTPUT_DESCRIPTION, 'r').read()
         current_language = self.debugger_guy.LANGUAGE_EXPERTISE
         # Let's template the report example based on the current language
-        patch_report_template = open(f'/src/discoveryguy/prompts/DebuggerGuy/extras-lang/exploits_reports/report.{current_language}', 'r').read()
+        patch_report_template = open(f'{PROMPTS_ROOT}/DebuggerGuy/extras-lang/exploits_reports/report.{current_language}', 'r').read()
         output_format = output_format.replace('<PLACEHOLDER_FOR_EXAMPLE_REPORTS_BY_LANGUAGE>', patch_report_template)
         return output_format
 
@@ -105,9 +108,9 @@ class DebuggerGuy(AgentWithHistory[dict, str]):
     # __LLM_MODEL__ = "oai-gpt-o3-mini"
     #__LLM_MODEL__ = "claude-3.7-sonnet"
 
-    __SYSTEM_PROMPT_TEMPLATE__ = "/src/discoveryguy/prompts/DebuggerGuy/system.j2"
+    __SYSTEM_PROMPT_TEMPLATE__ = f"{PROMPTS_ROOT}/DebuggerGuy/system.j2"
     
-    __USER_PROMPT_TEMPLATE__ = "/src/discoveryguy/prompts/DebuggerGuy/user.j2"
+    __USER_PROMPT_TEMPLATE__ = f"{PROMPTS_ROOT}/DebuggerGuy/user.j2"
 
     __OUTPUT_PARSER__ = MyParser
     __MAX_TOOL_ITERATIONS__ = 100
