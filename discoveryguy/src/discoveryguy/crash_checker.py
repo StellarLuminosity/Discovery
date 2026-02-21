@@ -16,16 +16,22 @@ class CrashChecker:
         self.__name__ = "CrashChecker"
 
         self.aggregated_harness_info = aggregated_harness_info
-        self.harness_infos = self.aggregated_harness_info['harness_infos']
-        self.build_configurations = self.aggregated_harness_info['build_configurations']
+        self.harness_infos = self.aggregated_harness_info.get('harness_infos', {})
+        self.build_configurations = self.aggregated_harness_info.get('build_configurations', {})
         self.cps = cps
-        use_task_service = False if local_run else True
 
         self.bld_config_to_cp = {}
         for build_config_id, build_config in self.build_configurations.items():
             for cp in self.cps:
                 if build_config_id in str(cp.project_path).split("/"):
                     self.bld_config_to_cp[build_config_id] = (cp, build_config['sanitizer'])
+
+        if not self.bld_config_to_cp and self.cps:
+            if self.build_configurations:
+                for build_config_id, build_config in self.build_configurations.items():
+                    self.bld_config_to_cp[build_config_id] = (self.cps[0], build_config.get('sanitizer', 'address'))
+            else:
+                self.bld_config_to_cp["local-build"] = (self.cps[0], "address")
 
         if Config.is_local_run:
             for cp in self.cps:

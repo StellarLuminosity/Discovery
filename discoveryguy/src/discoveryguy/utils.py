@@ -302,13 +302,14 @@ class JimmyMagicPathSimplifier:
 
 class SeedDropperManager:
 
-    def __init__(self, dg_id, project_name, harness_infos: dict, backup_seeds_vault: str, report_dir: str, crash_dir_pass_to_pov:str, crash_metadata_dir_pass_to_pov:str):
+    def __init__(self, dg_id, project_name, harness_infos: dict, backup_seeds_vault: str, report_dir: str, fuzzers_sync_base: str, crash_dir_pass_to_pov:str, crash_metadata_dir_pass_to_pov:str):
         self.dg_id = dg_id
         self.project_name = project_name
         self.backup_seeds_vault = backup_seeds_vault
         self.report_dir = report_dir
         os.makedirs(self.report_dir, exist_ok=True)
-        self.fuzzers_sync_base = "/shared/fuzzer_sync/"
+        self.fuzzers_sync_base = fuzzers_sync_base or os.path.join(self.report_dir, "fuzzer_sync")
+        os.makedirs(self.fuzzers_sync_base, exist_ok=True)
         self.crash_metadata_dir_pass_to_pov = crash_metadata_dir_pass_to_pov
         self.crash_dir_pass_to_pov = crash_dir_pass_to_pov
         self.harness_infos = harness_infos
@@ -325,7 +326,7 @@ class SeedDropperManager:
             harness_name = harness_info['cp_harness_name']
             random_id = os.urandom(16).hex()[0:10]
             new_sync_folder_name = f"{project_name}-{harness_name}-{harness_id}/sync-discoguy-{random_id}/queue/"
-            new_sync_folder_name = self.fuzzers_sync_base + new_sync_folder_name
+            new_sync_folder_name = os.path.join(self.fuzzers_sync_base, new_sync_folder_name)
             log.info(f"Creating sync folder: {new_sync_folder_name}")
             # Create the directory if it does not exist
             shutil.os.makedirs(new_sync_folder_name, exist_ok=True)
