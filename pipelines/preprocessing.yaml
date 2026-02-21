@@ -365,7 +365,7 @@ imports:
       sarif_heartbeat_paths: sarif_heartbeat_paths
 
   discovery_guy:
-    path: ../components/discoveryguy/pipeline.yaml
+    path: ../discoveryguy/pipeline.yaml
     repos:
       crs_tasks: crs_tasks
       java_crs_tasks: java_crs_tasks
