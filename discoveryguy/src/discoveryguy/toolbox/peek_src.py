@@ -298,36 +298,6 @@ class PeekSrcSkill:
         lines_below = file_lines_tot - (offset + num_lines_to_show)
         if lines_below > 0:
             file_view += f"({lines_below} lines below)\n"
-            with open(full_file_path, 'r') as file:
-                file_context = file.read()
-
-        # Grab the total number of lines in the file
-        file_lines_tot = len(file_context.splitlines())
-
-        num_lines_to_show = min(self.MAX_LINES_PER_VIEW, num_lines)
-
-        # Grab the lines from offset to self.MAX_LINES_PER_VIEW
-        file_lines_in_scope = file_context.splitlines()[offset:offset+num_lines_to_show]
-
-        # If we have no lines left, tell it to the llm.
-        if len(file_lines_in_scope) == 0:
-            return tool_error("No more lines to show.")
-
-        file_lines_in_scope = '\n'.join(file_lines_in_scope)
-
-        # Building the view!
-        file_view = f"\n[File: {file_path} ({file_lines_tot} lines total)]\n"
-        file_view += f"({offset} lines above)\n"
-
-        # Add the lines we are showing, add the line numbers at the beginning
-        for idx, line in enumerate(file_lines_in_scope.splitlines()):
-            idx = idx + offset
-            file_view += f"{idx + 1}: {line}\n"
-
-        # Finally, added the remaining line
-        lines_below = file_lines_tot - (offset + num_lines_to_show)
-        if lines_below > 0:
-            file_view += f"({lines_below} lines below)\n"
         else:
             file_view += f"(No lines below)\n"
 

@@ -8,6 +8,8 @@ from . import filesystem as filesystem
 from . import pydatatask as pydatatask
 from . import models as models
 
+# These paths are only valid when running inside the original monorepo.
+# In standalone mode they may not exist; code that actually uses them will fail at call time.
 ARTIPHISHELL_DIR = Path(__file__).parent.parent.parent.parent.parent
 LIBS_DIR = ARTIPHISHELL_DIR / "libs"
 C_INSTRUMENTATION_DIR = LIBS_DIR / "c-instrumentation"
@@ -20,6 +22,3 @@ LOG_FORMAT = (
     "%(asctime)s [%(levelname)-8s] "
     "%(name)s:%(lineno)d | %(message)s"
 )
-
-assert ARTIPHISHELL_DIR.is_dir()
-assert LIBS_DIR.is_dir()
