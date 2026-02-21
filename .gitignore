@@ -4,8 +4,6 @@ discoveryguy/src/discoveryguy/agents/__pycache__/
 discoveryguy/src/discoveryguy/toolbox/__pycache__/
 libs/libcodeql/src/libcodeql/__pycache__/
 discoveryguy/src/__pycache__/
-discoveryguy/local_artifacts/
-discoveryguy/standalone_outputs/
 discoveryguy/src/discoveryguy/__pycache__/
 libs/analysis-graph/build/
 libs/analysis-graph/src/analysis_graph/__pycache__/
