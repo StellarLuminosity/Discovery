@@ -127,8 +127,12 @@ class PeekSrcSkill:
         # Try to init 3rd party tools and set the config to false if they are not available
         if Config.use_codeql_server:
             from . import CodeQlSkill
-            self.codeql = CodeQlSkill(**kwargs)
-            Config.use_codeql_server = self.codeql.initialized
+            try:
+                self.codeql = CodeQlSkill(**kwargs)
+                Config.use_codeql_server = self.codeql.initialized
+            except Exception as e:
+                log.warning(f"Disabling CodeQL tools due to initialization error: {e}")
+                Config.use_codeql_server = False
 
         # This is the amount of tool calls we are keeping as "just done"
         # Basically if the LLM issues a tool call that was done in the last X calls, we tell

@@ -63,7 +63,12 @@ class TargetProject:
         self.harness_function_name = harness_function_name.strip() or "LLVMFuzzerTestOneInput"
         self.harness_source_path = harness_source_path.strip()
         self.crash_keywords = crash_keywords or self.DEFAULT_CRASH_KEYWORDS
-        self.artifacts_dir_work = Path(tempfile.mkdtemp(prefix="discoveryguy-work-"))
+        repo_root = Path(__file__).resolve().parents[3]
+        local_tmp_root = repo_root / "tmp"
+        local_tmp_root.mkdir(parents=True, exist_ok=True)
+        self.artifacts_dir_work = Path(
+            tempfile.mkdtemp(prefix="discoveryguy-work-", dir=str(local_tmp_root))
+        )
         self._built = False
 
     def build_builder_image(self):
