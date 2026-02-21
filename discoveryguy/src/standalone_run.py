@@ -196,6 +196,7 @@ def main():
     kwargs = {
         "project_id": cfg.target.project_id,
         "dg_id": cfg.target.dg_id,
+        "project_language": cfg.target.project_language,
         "project_source": cfg.target.source_dir,
         "target_source_dir": cfg.target.source_dir,
         "target_build_command": cfg.target.build_command,
