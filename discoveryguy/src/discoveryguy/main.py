@@ -2,7 +2,6 @@
 import os
 import logging
 import yaml
-import random
 import re
 import time
 import agentlib
@@ -19,27 +18,30 @@ import hashlib
 import base64
 
 from shellphish_crs_utils.sarif_resolver import SarifResolver
-from shellphish_crs_utils.models.aixcc_api import SARIFMetadata, Assessment
 from shellphish_crs_utils.function_resolver import LocalFunctionResolver, RemoteFunctionResolver
 from shellphish_crs_utils.models.coverage import FunctionCoverageMap, FileCoverageMap, FUNCTION_INDEX_KEY
 from shellphish_crs_utils.models.ranking import RankedFunction
 from shellphish_crs_utils.models import RunImageResult
 from shellphish_crs_utils.models.oss_fuzz import AugmentedProjectMetadata
 from shellphish_crs_utils.models.crs_reports import POIReport
-from shellphish_crs_utils.oss_fuzz.project import OSSFuzzProject
 from shellphish_crs_utils.models.target import HarnessInfo
 from agentlib.lib.common import LLMApiBudgetExceededError, LLMApiContextWindowExceededError, LLMApiRateLimitError
 from coveragelib import Tracer
 from shellphish_crs_utils.models.symbols import SourceLocation
 from shellphish_crs_utils.models.crs_reports import CrashingInputMetadata
 from shellphish_crs_utils.models.indexer import FunctionIndex
-from analysis_graph.models.harness_inputs import HarnessInputNode
 
 from .agents import JimmyPwn, SarifTriageGuy, SeedGenerationModel, HoneySelectAgent, SummaryAgent
-from .toolbox import PeekSrcSkill, PeekDiffSkill
+from .toolbox.peek_src import PeekSrcSkill
+try:
+    from .toolbox.peek_diff import PeekDiffSkill
+except Exception:
+    PeekDiffSkill = None
 from .crash_checker import CrashChecker
 from .utils import SeedDropperManager, HarnessResolver, HarnessFullInfo, JimmyMagicPathSimplifier, DiffResolver, CodeQLSourceLocationResolver, AVAILABLE_PYTHON_PACKAGES
-from .analysis_graph_api import AnalysisGraphAPI
+from .dg_models import SARIFMetadata, Assessment
+from .paths import RUN_DISCO_FUZZ_PATH
+from .target_project import TargetProject
 
 from coveragelib.parsers.line_coverage import C_LineCoverageParser_LLVMCovHTML
 
@@ -112,13 +114,12 @@ class DiscoveryGuy:
             curr_debug_build = os.path.realpath(os.path.join(self.oss_fuzz_debug_targets_folder, debug_build))
             curr_debug_build = os.path.join(curr_debug_build, "projects", self.project_name)
 
-            curr_cp_debug = OSSFuzzProject(
-                                    project_id = self.kwargs['project_id'],
-                                    # e.g.,: /shared/discoveryguy/tmp.123456/oss-fuzz/projects/nginx/
-                                    oss_fuzz_project_path=curr_debug_build,
-                                    augmented_metadata=self.project_yaml,
-                                    use_task_service=False
-                                    )
+            curr_cp_debug = TargetProject.from_oss_fuzz(
+                project_id=self.kwargs["project_id"],
+                oss_fuzz_project_path=curr_debug_build,
+                augmented_metadata=self.project_yaml,
+                use_task_service=False,
+            )
             self.cps_debug.append(curr_cp_debug)
 
         ########################################################
@@ -192,16 +193,12 @@ class DiscoveryGuy:
                                                 self.aggregated_harness_info['harness_infos'],
                                                 self.func_resolver
                                                 )
-        # A nice object to launch neo4j queries
-        self.analysis_graph_api = AnalysisGraphAPI()
-
-        # Path simplifier to trim real paths downloaded from the analysis graph
+        # Path simplifier for local-only harness/sink context.
         self.path_simplifier= JimmyMagicPathSimplifier(
-                                                       self.analysis_graph_api,
-                                                       self.harness_resolver,
-                                                       self.func_resolver,
-                                                       self.diff_file
-                                                       )
+            self.harness_resolver,
+            self.func_resolver,
+            self.diff_file,
+        )
 
         if Config.discoveryguy_mode == DiscoverGuyMode.DIFFONLY:
             self.diff_resolver = DiffResolver(self.diff_file, self.func_resolver)
@@ -215,12 +212,13 @@ class DiscoveryGuy:
             function_resolver=self.func_resolver,
             cp=self.cps_debug[0], # NOTE: it is ok to just pass one here, the built_src is the same
             project_metadata=self.project_yaml,
-            analysis_graph_api=self.analysis_graph_api,
             **kwargs
         )
 
         if Config.crs_mode == CRSMode.DELTA:
             # NOTE: this skill is only enabled in delta mode.
+            if PeekDiffSkill is None:
+                raise RuntimeError("Diff mode is unavailable because PeekDiffSkill dependencies are missing.")
             self.peek_diff = PeekDiffSkill(
                 func_resolver=self.func_resolver,
                 changed_func_resolver=self.changed_func_resolver,
@@ -249,7 +247,7 @@ class DiscoveryGuy:
         # keep state for jimmypwn
         self.how_many_opus = 0
         try:
-            fuzz_script = open('/src/run_disco_fuzz.py','rb').read()
+            fuzz_script = RUN_DISCO_FUZZ_PATH.read_bytes()
             # Now lets base64 encode the fuzz script
             self.fuzz_payload = base64.b64encode(fuzz_script).decode('utf-8')
         except Exception as e:
@@ -363,24 +361,6 @@ class DiscoveryGuy:
         keys = self.diff_resolver.get_sinks()
         return keys
 
-    # def get_closest_benign_seed_to_sink(self, path):
-    #     for node in path[::-1]:
-    #         seed = self.analysis_graph_api.get_benign_input_for_function(node['name'])
-    #         if len(seed) > 0:
-    #             logger.info(f" 🌱 Found a benign seed for {node['name']} on the path to the sink")
-    #             seed_content = seed[0][0].content_escaped
-    #             return seed_content.encode().decode('unicode_escape')[0:Config.max_bytes_for_benign_seed_template], node['name']
-    # def get_closest_benign_seed_to_sink(self, path):
-    #     for node in path[::-1]:
-    #         seed = self.analysis_graph_api.get_benign_input_for_function(node['name'])
-    #         if len(seed) > 0:
-    #             logger.info(f" 🌱 Found a benign seed for {node['name']} on the path to the sink")
-    #             seed_content = seed[0][0].content_escaped
-    #             return seed_content.encode().decode('unicode_escape')[0:Config.max_bytes_for_benign_seed_template], node['name']
-
-    #     return None, None
-    #     return None, None
-
     def run_seed_generation(self, seedAgent:SeedGenerationModel, reached_harnesses:dict, sink_index_key, report_attempt_no, seed_attempt_no):
         id = uuid.uuid4()
         sandbox = self.sandbox
@@ -448,8 +428,8 @@ class DiscoveryGuy:
         # NOTE: we are out of the loop, we have a Python script 🐍!
         #       Let's try to run the python script in the sandbox 🏖️ to
         #       produce a seed!
-        bash_script = os.getcwd() + "/discoveryguy/run_script.sh"
-        shutil.copy(bash_script, script_input+"/run_script.sh")
+        bash_script = Path(__file__).with_name("run_script.sh")
+        shutil.copy(str(bash_script), script_input+"/run_script.sh")
 
         # 🏖️
         sandbox_report = sandbox.runner_image_run(f"/work/run_script.sh")
@@ -517,22 +497,6 @@ class DiscoveryGuy:
                     logger.warning(f' 👹 We crashed the target with this harness: {crashing_harness_info}')
                 break
         ########################################################
-
-        if Config.discoveryguy_mode == DiscoverGuyMode.SARIF:
-            # Add the connection to the analysis graph for bundling later!
-            try:
-                # NOTE: crashing_harness.info_id --> this is the id of the harness as per pdt
-                # NOTE: crashing_harness_info --> a HarnessInfo object
-                seed_id = self.seedDropperManager.send_seed_to_analysis_graph(crashing_harness_info_id, crashing_harness_info, crash_txt, True)
-                if seed_id is not None:
-                    logger.info(f"🌱💾 Seed successfully added to the analysis graph with id {seed_id}")
-                    try:
-                        self.analysis_graph_api.link_seed_to_sarif(seed_id, self.sarif_meta.pdt_sarif_id, self.sarif_resolver)
-                        logger.info(f'🌱🔗📊 Seed linked to SarifReport {self.sarif_meta.pdt_sarif_id} in the analysis graph!')
-                    except Exception as e:
-                        logger.error(f'🌱⛓️‍💥📊 Failed linking seeds and SarifReport...')
-            except Exception as e:
-                logger.error(f'🌱😢 Failed to upload seed to analysis graph...')
 
         ########################################################
         # 🔄 Save the seed in ALL the harnesses queue (why not!)
@@ -1167,16 +1131,6 @@ class DiscoveryGuy:
             sink_full_info:FunctionIndex = self.func_resolver.get(sink_index_key)
             sink_funcname:str = self.func_resolver.get_funcname(sink_index_key)
 
-            if Config.skip_already_pwned and Config.discoveryguy_mode != DiscoverGuyMode.SARIF:
-                # NOTE: for SARIF, we would still like to try to genereate a seed given the precise
-                #       information in the report (we also are gonna create the link here!)
-                try:
-                    if len(self.analysis_graph_api.is_sink_crashed_already(sink_funcname)) != 0:
-                        logger.info(f" 🚰💥✅ POI {sink_index_key} is already crashed! skipping...")
-                        continue
-                except Exception as e:
-                    logger.warning(f"Error while checking for existing crashes for sink {sink_index_key}: {e}. Skipping this check...")
-
             if sink_full_info is None:
                 # NOTE: something terribly broken?
                 logger.info(f" 🚮 POI {sink_full_info} not found in the function index, skipping...")
@@ -1184,30 +1138,13 @@ class DiscoveryGuy:
 
             checked_sinks += 1
 
-            # NOTE: Here is fine to use the function_index_key because we are looking for a
-            #       static path from the harness to the sink (without using coverage data)
+            # Standalone mode uses local harness metadata only.
             with_path:bool = False
             # NOTE: A good crash is a crash that contains the sink function, everything else
             #       is considered unintended.
             found_good_crash:bool = False
             # NOTE: we are gonna store here all the harnesses in scope for this sink
             reached_harnesses:dict = {}
-            # NOTE: the prefix is the harness prefix function (depends on the language)
-            prefix:str = self.harness_resolver.get_harness_prefix_in_scope()
-            # NOTE: this is returning all the HarnessesNode in scope (i.e., do we find a path?)
-            try:
-                harnesses_in_scope:List = self.analysis_graph_api.check_exists_path_to_harness(prefix, sink_index_key)
-            except Exception as e:
-                logger.error(f"Error while checking path to harness for sink {sink_index_key}: {e}")
-                harnesses_in_scope = []
-
-            if len(harnesses_in_scope) == 0:
-                # NOTE: If we cannot find a path from harness to sink in analysis graph we try all the harnesses.
-                logger.info(f" 🚰😶‍🌫️ No harnesses can reach this sink {sink_index_key}")
-                with_path = False
-            else:
-                logger.info(f" 🚰👍 {len(harnesses_in_scope)} harnesses can reach this sink {sink_index_key}")
-                with_path = True
 
             all_harnesses = {}
             for harness in self.harness_resolver.get_all_harnesses():

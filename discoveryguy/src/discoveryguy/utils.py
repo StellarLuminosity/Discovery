@@ -3,31 +3,34 @@ import re
 import subprocess
 import logging
 import shutil
-import networkx as nx
+try:
+    import networkx as nx
+except Exception:
+    nx = None
 import shlex
 import uuid
 import hashlib
 import yaml
-import whatthepatch
+try:
+    import whatthepatch
+except Exception:
+    whatthepatch = None
 
 from typing import List, Union
-from shellphish_crs_utils.oss_fuzz.project import OSSFuzzProject
 from shellphish_crs_utils.models.coverage import FUNCTION_INDEX_KEY, FunctionIndex
 from shellphish_crs_utils.models.ranking import RankedFunction
 from shellphish_crs_utils.utils import safe_decode_string
 from shellphish_crs_utils.models.crs_reports import CrashingInputMetadata
 from shellphish_crs_utils.models.target import HarnessInfo
-from analysis_graph.models.harness_inputs import HarnessInputNode
+from .target_project import TargetProject
 
 from pathlib import Path
-from functools import reduce
 
 from .config import Config, DiscoverGuyMode, CRSMode
 
 log = logging.getLogger("discoveryguy.utils")
 logger = log
 import signal
-from .analysis_graph_api import AnalysisGraphAPI
 # DEFINE THESE AS GLOBAL SO THAT WE CAN KEEP TRACK OF WHAT WE HAVE SEEN IN THE PREV.RUNS
 # need to keep track of functions we have seen so that we don't loop back to them
 # seen = set()
@@ -108,6 +111,8 @@ class CodeQLSourceLocationResolver:
 
 class DiffResolver:
     def __init__(self, diff_file, func_resolver):
+        if whatthepatch is None:
+            raise RuntimeError("whatthepatch is required for diff mode but is not installed")
         self.func_resolver = func_resolver
         self.diff_file = diff_file
         with open(self.diff_file, "r") as f:
@@ -145,7 +150,7 @@ class HarnessFullInfo:
         self.code = code
 
 class HarnessResolver:
-    def __init__(self, cp_debug:OSSFuzzProject, project_language, harness_infos:dict, func_resolver):
+    def __init__(self, cp_debug:TargetProject, project_language, harness_infos:dict, func_resolver):
         self.cp_debug = cp_debug
         self.project_language = project_language
         self.harness_infos = harness_infos
@@ -230,14 +235,14 @@ class HarnessResolver:
 # NOTE, Jimmy's magic 🪄: simplify the paths
 #################################################
 class JimmyMagicPathSimplifier:
-    def __init__(self, analysis_graph_api:AnalysisGraphAPI, harness_resolver: HarnessResolver, func_resolver, diff_file):
-        self.analysis_graph_api = analysis_graph_api
+    def __init__(self, harness_resolver: HarnessResolver, func_resolver, diff_file):
         self.harness_resolver = harness_resolver
         self.func_resolver = func_resolver
         self.diff_file = diff_file
-        self.sink_graphs = []
 
     def _get_diff(self, function_index: str) -> str:
+        if whatthepatch is None:
+            return "Diff support is unavailable because whatthepatch is not installed."
         with open(self.diff_file, "r") as f:
             diff_text = f.read()
 
@@ -283,105 +288,16 @@ class JimmyMagicPathSimplifier:
             return ALL_TEXT
 
     def get_nodes(self, reached_harnesses, sink_index_key, with_path:bool=False) -> str:
-        if with_path:
-            for _, harness in reached_harnesses.items():
-                try:
-                    signal.alarm(10)  # 10 second timeout
-                    paths = self.analysis_graph_api.get_paths_from_harness_to_sink(
-                        harness.bin_name,
-                        sink_index_key
-                    )
-                    signal.alarm(0)  # Cancel alarm on success
-                except TimeoutError:
-                    print("Analysis Graph request timed out!")
-                    continue
-                except Exception as e:
-                    signal.alarm(0)  # Make sure to cancel alarm on other exceptions
-                    print(f"Other error: {e}")
-                    continue
-                try:
-                    for path in paths:
-                        tmp_relations = path[0].relationships
-                        G = nx.DiGraph()
-                        for rel in tmp_relations:
-                            G.add_edge(rel.start_node().identifier, rel.end_node().identifier)
-                        self.sink_graphs.append(G)
-                except Exception as e:
-                    logger.error(f"Error in get_paths_from_harness_to_sink:{sink_index_key}, {e}")
-                    continue
-            try:
-                G_merged = reduce(nx.compose, self.sink_graphs)
-                old_nodes, G_without_cycle = reduce_cycle(G_merged)
-                G_optimized = find_functions_with_one_caller_and_one_callee(G_without_cycle, list(reached_harnesses.keys()), sink_index_key)
-                new_nodes, G_optimized_without_cycle = reduce_cycle(G_optimized)
-                logger.info(f" 🚰🛣️ Found {len(new_nodes)} nodes in the optimized graph for {sink_index_key} with {len(reached_harnesses)} harnesses, before there are {len(old_nodes)} nodes in the graph.")
-            except Exception as e:
-                logger.error(f"Error in reduce_cycle or find_functions_with_one_caller_and_one_callee: {e}")
-                new_nodes = []
-
-
-            # NOTE: Get the nodes for different modes
-            if Config.crs_mode == CRSMode.FULL:
-                nodes = []
-                for key in new_nodes:
-                    if key == "__connector__":
-                        logger.info("Resolving __connector__ ...")
-                        name = "__connector__"
-                        code = "This is a connector node, not an actual function. It abstracts a group of intermediate functions that link otherwise disjoint paths. The functions that are in the cluster are: \n"
-                        # import ipdb; ipdb.set_trace()
-                        functions_in_cluster = set(old_nodes)-set(new_nodes)
-                        for index in functions_in_cluster:
-                            tmp_name = self.func_resolver.get_funcname(index)
-                            code += f" - {tmp_name} \n"
-                    else:
-                        code = self.func_resolver.get_code(key)[-1]
-                        name = self.func_resolver.get_funcname(key)
-                    nodes.append({
-                        "key": key,
-                        "code": code,
-                        "name": name
-                    })
-            else:
-                # NOTE: in this case we also include the diff for each function in the path
-                nodes = []
-                for key in new_nodes:
-                    if key == "__connector__":
-                        logger.info("Resolving __connector__ ...")
-                        code = "This is a connector node, not an actual function. It abstracts a group of intermediate functions that link otherwise disjoint paths. The functions that are in the cluster are: "
-                        functions_in_cluster = set(old_nodes)-set(new_nodes)
-                        diff = "In this cluster, the diff for these functions are in the cluster are: \n"
-                        name = "__connector__"
-                        for index in functions_in_cluster:
-                            tmp_name = self.func_resolver.get_funcname(index)
-                            code += f" - {tmp_name} \n"
-                            tmp_diff = self._get_diff(index)
-                            diff += f" - {tmp_name} \n"
-                            diff += tmp_diff
-
-                    else:
-                        code = self.func_resolver.get_code(key)[-1]
-                        name = self.func_resolver.get_funcname(key)
-                        diff = self._get_diff(key)
-
-                    nodes.append({
-                        "key": key,
-                        "code": code,
-                        "name": name,
-                        "diff": diff
-                    })
-        else:
-            # NOTE: in this case we do not have a path from the harness to the sink
-            #       so we just use the function itself  and the harnesses as the node
-            nodes = []
-            for harness_func_key, harness in list(reached_harnesses.items()):
-                code = self.func_resolver.get_code(harness_func_key)[-1]
-                name = self.func_resolver.get_funcname(harness_func_key)
-                nodes.append({
-                    "key": harness_func_key,
-                    "code": code,
-                    "name": name,
-                })
-
+        # Standalone mode: keep node context deterministic and local-only.
+        nodes = []
+        for harness_func_key, harness in list(reached_harnesses.items()):
+            code = self.func_resolver.get_code(harness_func_key)[-1]
+            name = self.func_resolver.get_funcname(harness_func_key)
+            nodes.append({
+                "key": harness_func_key,
+                "code": code,
+                "name": name,
+            })
         return nodes
 
 class SeedDropperManager:
@@ -493,31 +409,6 @@ class SeedDropperManager:
                 break
         else:
             logger.critical(f"[FIXME] Crashing harness info ID {crashing_harness_info_id} not found in harness infos!")
-
-    def send_seed_to_analysis_graph(self, crashing_harness_info_id, crashing_harness_info, crash_txt, is_crashing):
-
-        with open(crash_txt, "rb") as f:
-            seed_content = bytearray(f.read())
-
-        try:
-            crashing_input_id = HarnessInputNode.create_node(
-                        harness_info_id=crashing_harness_info_id,
-                        harness_info=crashing_harness_info,
-                        content=seed_content,
-                        crashing=is_crashing
-                    )
-        except Exception as e:
-            logger.warning(f"👀 Failed to create harness input node in analysis graph: {e}")
-            crashing_input_id = None
-
-        if crashing_input_id != None:
-            try:
-                cid = crashing_input_id[1].identifier
-                return cid
-            except Exception as e:
-                return None
-        else:
-            return None
 
 # grab vulnerable function from local data
 def get_vuln_function(vuln_code):
@@ -967,7 +858,7 @@ def run_fuzzer(project, harness_info ,crashing_seeds_path, timeout=300, print_ou
     Run the LibFuzzer fuzzer on the given harness with the provided crashing seeds.
     This function sets up the necessary directories and command to run LibFuzzer.
     Args:
-        project (OSSFuzzProject): The OSSFuzzProject object for the correct build.
+        project (TargetProject): The target project object for the correct build.
         harness_info (dict): The harness information dictionary containing the harness binary path.
         crashing_seeds_path (str or Path): The path to the directory containing crashing seeds.
         timeout (int): The timeout for the fuzzer run in seconds.
