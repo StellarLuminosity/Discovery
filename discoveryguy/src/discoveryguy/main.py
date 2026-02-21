@@ -21,8 +21,6 @@ from shellphish_crs_utils.sarif_resolver import SarifResolver
 from shellphish_crs_utils.function_resolver import LocalFunctionResolver, RemoteFunctionResolver
 from shellphish_crs_utils.models.coverage import FunctionCoverageMap, FileCoverageMap, FUNCTION_INDEX_KEY
 from shellphish_crs_utils.models.ranking import RankedFunction
-from shellphish_crs_utils.models import RunImageResult
-from shellphish_crs_utils.models.oss_fuzz import AugmentedProjectMetadata
 from shellphish_crs_utils.models.crs_reports import POIReport
 from shellphish_crs_utils.models.target import HarnessInfo
 from agentlib.lib.common import LLMApiBudgetExceededError, LLMApiContextWindowExceededError, LLMApiRateLimitError
@@ -88,12 +86,15 @@ class DiscoveryGuy:
             self.changed_function_index = None
             self.diff_file = None
 
-        # Load data from the agumented project metadata
-        with open(self.target_metadata, 'r') as f:
-            self.project_yaml = AugmentedProjectMetadata.model_validate(yaml.safe_load(f))
-        self.project_language = self.project_yaml.language.value
-        self.project_name = self.project_yaml.get_project_name()
-        assert self.project_name != None
+        # Load project metadata: derive language and name from YAML or kwargs fallbacks.
+        _raw_meta = {}
+        if self.target_metadata and Path(self.target_metadata).exists():
+            with open(self.target_metadata, 'r') as f:
+                _raw_meta = yaml.safe_load(f) or {}
+        self.project_yaml = _raw_meta
+        self.project_language = self.kwargs.get('project_language') or _raw_meta.get('language', 'c')
+        self.project_name = _raw_meta.get('name') or _raw_meta.get('project_name') or self.project_id
+        assert self.project_name is not None
 
         self.aggregated_harness_info = None
         with open(self.kwargs['aggregated_harness_info_file'], "r") as file:
