@@ -6,6 +6,7 @@ from libcodeql.client import CodeQLClient
 from jinja2 import Environment, FileSystemLoader
 from .peek_utils import *
 from ..config import Config
+from ..paths import CODEQL_TEMPLATES_ROOT
 
 import yaml
 import os
@@ -113,7 +114,15 @@ class CodeQlSkill:
         else:
             self.client = CodeQLClient()
 
-        self.jinja_env = Environment(loader=FileSystemLoader('/src/patcherq/toolbox/templates/codeQL'))
+        if not CODEQL_TEMPLATES_ROOT.exists():
+            logger.warning(
+                "CodeQL templates not found at %s; disabling CodeQL tools for standalone mode.",
+                CODEQL_TEMPLATES_ROOT,
+            )
+            self.initialized = False
+            return
+
+        self.jinja_env = Environment(loader=FileSystemLoader(str(CODEQL_TEMPLATES_ROOT)))
         self.initialized = True
 
         self.codeql_results_cache = {}
