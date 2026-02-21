@@ -38,16 +38,28 @@ class StandaloneIOConfig:
     fuzzers_sync_base: str = ""
     crash_dir_pass_to_pov: str = ""
     crash_metadata_dir_pass_to_pov: str = ""
+    # Optional CodeQL database archive path (zip) or a directory containing it.
     codeql_db_path: str = ""
 
 
 @dataclass
 class StandaloneRuntimeConfig:
     mode: str = "POIS"  # POIS or SARIF
+    low_cost_mode: bool = True
     local_run: bool = True
     use_codeql_server: bool = False
     send_fuzz_request: bool = False
     skip_already_pwned: bool = False
+    # Cost/throughput knobs.
+    max_pois_to_check: int = 3
+    max_sarif_results_to_check: int = 3
+    exploit_attempts_per_sink: int = 1
+    seed_regen_attempts: int = 1
+    sarif_use_llm_triage: bool = False
+    sarif_bump_attempts: bool = False
+    jimmypwn_max_tool_iterations: int = 40
+    jimmypwn_max_tokens: int = 4096
+    enable_codeql_tools_for_jimmypwn: bool = True
     # Enable agentlib LLM API proxy mode (litellm-style backend).
     use_llm_api: bool = False
     llm_api_url: str = ""
@@ -85,7 +97,20 @@ ACTIVE_CONFIG = StandaloneConfig(
     ),
     runtime=StandaloneRuntimeConfig(
         mode="POIS",
+        low_cost_mode=True,
         local_run=True,
         use_codeql_server=False,
+        max_pois_to_check=3,
+        max_sarif_results_to_check=3,
+        exploit_attempts_per_sink=1,
+        seed_regen_attempts=1,
+        sarif_use_llm_triage=False,
+        sarif_bump_attempts=False,
+        jimmypwn_max_tool_iterations=40,
+        jimmypwn_max_tokens=4096,
+        enable_codeql_tools_for_jimmypwn=True,
+        jimmypwn_models=["gpt-o4-mini", "o3"],
+        summary_models=["o3", "gpt-o4-mini"],
+        honey_select_models=["o3", "gpt-o4-mini"],
     ),
 )
