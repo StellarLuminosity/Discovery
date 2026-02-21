@@ -8,7 +8,12 @@ from agentlib.lib.common.parsers import BaseParser
 from ..toolbox.peek_src import get_functions_by_file, show_file_at
 from ..toolbox.peek_dbg import check_coverage_for, check_value_of_variable_at
 from ..toolbox import lookup_symbol
-from ..toolbox.code_ql_ops import get_function_callers, get_struct_definition, get_struct_definition_location
+from ..toolbox.code_ql_ops import (
+    get_function_callers,
+    get_struct_definition_location,
+    get_function_definition_location,
+)
+from ..config import Config
 from ..paths import PROMPTS_ROOT as _PROMPTS_ROOT
 
 PROMPTS_ROOT = str(_PROMPTS_ROOT)
@@ -254,6 +259,13 @@ class JimmyPwn(AgentWithHistory[dict, str]):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Runtime cost controls from Config.
+        JimmyPwn.__MAX_TOOL_ITERATIONS__ = Config.jimmypwn_max_tool_iterations
+        JimmyPwn.__LLM_ARGS__ = {
+            **JimmyPwn.__LLM_ARGS__,
+            "max_tokens": Config.jimmypwn_max_tokens,
+        }
+
         self.LANGUAGE_EXPERTISE = kwargs["LANGUAGE_EXPERTISE"]
         self.PROJECT_NAME = kwargs["PROJECT_NAME"]
         self.FUNCTION_INDEX = kwargs["FUNCTION_INDEX"]
@@ -307,8 +319,16 @@ class JimmyPwn(AgentWithHistory[dict, str]):
         JimmyPwn.__OUTPUT_PARSER__ = simpleParser
 
     def get_available_tools(self):
-        # import ipdb; ipdb.set_trace()
-        return [lookup_symbol]
+        tools = [lookup_symbol]
+        if Config.use_codeql_server and Config.enable_codeql_tools_for_jimmypwn:
+            tools.extend(
+                [
+                    get_function_callers,
+                    get_struct_definition_location,
+                    get_function_definition_location,
+                ]
+            )
+        return tools
 
     def get_output_parser(self):
         return MyParser(exp_dev=self)
