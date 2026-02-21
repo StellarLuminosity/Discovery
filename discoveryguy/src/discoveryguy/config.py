@@ -31,7 +31,7 @@ class CONFIG:
     discoveryguy_mode: DiscoverGuyMode = DiscoverGuyMode.POIS
 
     # services
-    use_codeql_server: bool = True
+    use_codeql_server: bool = False
     is_permanence_on: bool = False
 
     # running state
@@ -40,26 +40,17 @@ class CONFIG:
     disco_guy_mode: str = ''
     disco_guy_from: str = ''
 
-    # for nap mode
-    nap_mode: bool = True
-    # What is the next N minute mark we are waking up from the nap
-    nap_duration: int = 8 # this is in minutes
-    # If we are in nap mode, we will wait N seconds before trying to wake up
+    # Standalone mode defaults: no competition nap behavior.
+    nap_mode: bool = False
+    nap_duration: int = 8
     nap_snoring: int = 60
-    # If we wake up N times in a row and there is no budget, we kill the component.
-    nap_becomes_death_after: int = 100
+    nap_becomes_death_after: int = 0
     max_analysis_report_length: int = 10000
     min_analysis_report_length: int = 3000
     # knobs
 
     # Whether we skip already pwned vulnerabilities
     skip_already_pwned: bool = True
-
-    # MAX budget given to discovery guy
-    # TODO(FINALDEPLOY)
-    discoguy_budget_limit = 100
-    # TODO(FINALDEPLOY)
-    discoguy_from_diff_budget_limit = 20
 
     # How many iterations before we stop trying to find a bypass for a patch
     max_attempts_bypass = 5
