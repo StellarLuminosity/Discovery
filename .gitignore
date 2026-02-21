@@ -13,3 +13,5 @@ libs/crs-telemetry/src/crs_telemetry.egg-info/
 libs/crs-telemetry/src/crs_telemetry/__pycache__/
 libs/libcodeql/build/
 libs/libcodeql/src/libcodeql.egg-info/
+logs/
+tmp/
