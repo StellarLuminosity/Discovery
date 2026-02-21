@@ -56,13 +56,19 @@ class CONFIG:
     max_attempts_bypass = 5
 
     # How many times we try to exploit a warning per single harness in scope
-    exploit_dev_max_attempts_per_sink: int = 2
+    exploit_dev_max_attempts_per_sink: int = 1
 
     # How many times we will try to fix the python script in a row
-    exploit_dev_max_attempts_regenerate_script: int = 3
+    exploit_dev_max_attempts_regenerate_script: int = 1
 
     # When a code-swipe report is available, we will extract the top N functions
-    max_pois_to_check: int = 300
+    max_pois_to_check: int = 5
+    # For SARIF mode, maximum results to process (0 means all)
+    max_sarif_results_to_check: int = 0
+    # In SARIF mode, run the SarifTriageGuy LLM pass before exploit generation
+    sarif_use_llm_triage: bool = True
+    # Preserve legacy SARIF behavior: +1 exploit/script regeneration attempts
+    sarif_bump_attempts: bool = True
 
     # When multiple harnesses are available we will use the top N
     max_harness_per_poi: int = 5
@@ -90,6 +96,12 @@ class CONFIG:
     honey_select_llms: list = field(default_factory=lambda: ['claude-4-sonnet', 'o3'])
 
     bypass_agents_llms: list = field(default_factory=lambda: ['claude-4-sonnet', 'o3'])
+
+    # jimmypwn cost controls
+    jimmypwn_max_tool_iterations: int = 75
+    jimmypwn_max_tokens: int = 10240
+    # If true and CodeQL is enabled, expose CodeQL tools directly to JimmyPwn
+    enable_codeql_tools_for_jimmypwn: bool = True
 
     # others
     suppress_run_pov_output: bool = True
