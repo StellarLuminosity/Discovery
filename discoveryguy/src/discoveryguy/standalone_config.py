@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 class StandaloneTargetConfig:
     project_id: str = "local-project"
     dg_id: str = "1"
+    project_language: str = "c"
     source_dir: str = ""
     build_command: str = ""
     # Template used by TargetProject.run_pov(). Supported placeholders:
