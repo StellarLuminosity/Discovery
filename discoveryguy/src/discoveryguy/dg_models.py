@@ -1,6 +1,7 @@
 
-
-from typing import List, Dict, Tuple, Union
+from enum import Enum
+from typing import Any, Dict, List, Tuple, Union
+from pydantic import BaseModel
 
 class PointOfInterest:
     def __init__(self, vuln, file, func, start_line, end_line="X", extra_info=None):
@@ -64,3 +65,18 @@ class SarifResult:
     def __repr__(self):
         return (f"SarifResult(rule_id={self.rule_id}, files={self.files}, "
                 f"func_loc={self.func_loc}, dataflow={self.dataflows}), sarif_raw_result={self.sarif_raw_result}")
+
+
+class Assessment(str, Enum):
+    AssessmentCorrect = "assessment_correct"
+    AssessmentIncorrect = "assessment_incorrect"
+
+
+class SARIFMetadata(BaseModel):
+    task_id: str
+    sarif_id: str
+    pdt_sarif_id: str
+    pdt_task_id: str
+    metadata: Dict[str, Any]
+    assessment: Assessment | None = None
+    description: str | None = None
