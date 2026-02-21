@@ -112,6 +112,14 @@ def _validate_config() -> list[str]:
         elif not p.is_dir():
             errors.append(f"{name} is not a directory: {value}")
 
+    def _req_path(name: str, value: str):
+        if not value:
+            errors.append(f"{name} is empty")
+            return
+        p = Path(value)
+        if not p.exists():
+            errors.append(f"{name} does not exist: {value}")
+
     mode = cfg.runtime.mode.upper()
     if mode not in {"POIS", "SARIF"}:
         errors.append(f"Unsupported mode '{cfg.runtime.mode}'. Standalone supports only POIS or SARIF.")
@@ -129,7 +137,7 @@ def _validate_config() -> list[str]:
     if cfg.io.aggregated_harness_info_file:
         _req_file("aggregated_harness_info_file", cfg.io.aggregated_harness_info_file)
     if cfg.io.codeql_db_path:
-        _req_dir("codeql_db_path", cfg.io.codeql_db_path)
+        _req_path("codeql_db_path", cfg.io.codeql_db_path)
 
     if cfg.runtime.use_llm_api:
         if not cfg.runtime.llm_api_url.strip():
@@ -178,6 +186,19 @@ def main():
     Config.send_fuzz_request = cfg.runtime.send_fuzz_request
     Config.skip_already_pwned = cfg.runtime.skip_already_pwned
     Config.nap_mode = False
+    Config.max_pois_to_check = max(1, int(cfg.runtime.max_pois_to_check))
+    Config.max_sarif_results_to_check = max(0, int(cfg.runtime.max_sarif_results_to_check))
+    Config.exploit_dev_max_attempts_per_sink = max(1, int(cfg.runtime.exploit_attempts_per_sink))
+    Config.exploit_dev_max_attempts_regenerate_script = max(1, int(cfg.runtime.seed_regen_attempts))
+    Config.sarif_use_llm_triage = cfg.runtime.sarif_use_llm_triage
+    Config.sarif_bump_attempts = cfg.runtime.sarif_bump_attempts
+    Config.jimmypwn_max_tool_iterations = max(1, int(cfg.runtime.jimmypwn_max_tool_iterations))
+    Config.jimmypwn_max_tokens = max(256, int(cfg.runtime.jimmypwn_max_tokens))
+    Config.enable_codeql_tools_for_jimmypwn = cfg.runtime.enable_codeql_tools_for_jimmypwn
+
+    if cfg.runtime.low_cost_mode:
+        Config.check_top_n_with_opus = False
+
     if cfg.runtime.jimmypwn_models:
         Config.jimmypwn_llms = list(cfg.runtime.jimmypwn_models)
     if cfg.runtime.summary_models:
