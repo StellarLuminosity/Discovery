@@ -54,9 +54,31 @@ from shellphish_crs_utils.models.oss_fuzz import (
 )
 from shellphish_crs_utils.models.constraints import PDT_ID
 from shellphish_crs_utils.oss_fuzz.quote_unquote_imported.helper import docker_run
-from crs_telemetry.utils import init_otel, get_otel_tracer
 
 from contextlib import contextmanager
+
+try:
+    from crs_telemetry.utils import init_otel, get_otel_tracer
+except Exception:
+    def init_otel(*args, **kwargs):
+        return None
+
+    class _NoopSpan:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def __call__(self, fn):
+            return fn
+
+    class _NoopTracer:
+        def start_as_current_span(self, *args, **kwargs):
+            return _NoopSpan()
+
+    def get_otel_tracer():
+        return _NoopTracer()
 
 @contextmanager
 def optional_filelock(lock_path, timeout=10, max_retries=3, retry_delay=0.1):
