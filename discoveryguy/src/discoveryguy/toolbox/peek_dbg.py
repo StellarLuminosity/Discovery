@@ -11,8 +11,8 @@ from shellphish_crs_utils.models.indexer import FunctionIndex
 from shellphish_crs_utils.models.crs_reports import RootCauseReport
 from agentlib import tools
 from shellphish_crs_utils.models import POIReport
-from shellphish_crs_utils.oss_fuzz.project import OSSFuzzProject
 from shellphish_crs_utils.function_resolver import LocalFunctionResolver, RemoteFunctionResolver
+from ..target_project import TargetProject
 
 log = logging.getLogger("peek_dbg")
 
@@ -80,7 +80,7 @@ def get_dynamic_coverage(depth: int = 3) -> str:
 class PeekDBGSkill:
     def __init__(
                  self, 
-                 oss_fuzz_project: OSSFuzzProject, 
+                 oss_fuzz_project: TargetProject, 
                  func_resolver: Union[LocalFunctionResolver, RemoteFunctionResolver],
                 ):
         

@@ -11,7 +11,6 @@ from pathlib import Path
 from shellphish_crs_utils.models.target import VALID_SOURCE_FILE_SUFFIXES
 from shellphish_crs_utils.utils import safe_decode_string
 from shellphish_crs_utils.models.indexer import FUNCTION_INDEX_KEY, FunctionIndex
-from shellphish_crs_utils.oss_fuzz.project import OSSFuzzProject
 from shellphish_crs_utils.models.symbols import RelativePathKind
 from shellphish_crs_utils.function_resolver import RemoteFunctionResolver
 from shellphish_crs_utils.models.coverage import FileCoverageMap, FunctionCoverageMap
@@ -111,6 +110,7 @@ class PeekSrcSkill:
 
         # The amount of lines we are returning once we open a file
         self.MAX_LINES_PER_VIEW = 100
+        self.MAX_FUNCTIONS_PER_PAGE = 50
 
         self.function_resolver = kwargs["function_resolver"]
         self.function_indices_path = kwargs["function_index"]
@@ -151,6 +151,37 @@ class PeekSrcSkill:
     def clean_tool_call_history(self):
         self.last_tool_calls_performed = []
         self.record = []
+
+    def _resolve_source_file_path(self, func_key: FUNCTION_INDEX_KEY) -> str | None:
+        function_info = self.function_resolver.get(func_key)
+        if not function_info or not function_info.target_container_path:
+            return None
+
+        relative_file_path = str(function_info.target_container_path).lstrip("/")
+        rel_path = Path(relative_file_path)
+        candidates = []
+
+        # Standalone local source tree first.
+        candidates.append(Path(self.project_source) / rel_path)
+        if rel_path.parts and rel_path.parts[0] == "src" and len(rel_path.parts) > 1:
+            candidates.append(Path(self.project_source) / Path(*rel_path.parts[1:]))
+        candidates.append(Path(self.project_source) / rel_path.name)
+
+        # Backward compatibility with old built-src artifact layout.
+        if relative_file_path.startswith("src/"):
+            built_rel = relative_file_path.replace("src/", "built_src/", 1)
+            candidates.append(Path(self.cp.project_path) / "artifacts" / built_rel)
+
+        for candidate in candidates:
+            if candidate.exists() and candidate.is_file():
+                return str(candidate)
+
+        # Last resort by filename in the source tree.
+        for candidate in Path(self.project_source).rglob(rel_path.name):
+            if candidate.is_file():
+                return str(candidate)
+
+        return None
 
     def get_functions_by_file(self, file_path: str, page: int) -> str:
         """
@@ -216,7 +247,6 @@ class PeekSrcSkill:
             return tool_error(f'The file {file_path} does not exist or it is out of scope!')
 
         # NOTE: Verify that the functions in that file are in scope.
-        #       We can technically simplify this by using the focus_repo_rel_path attribute in OSSFuzzProject.
         functions_in_scope = []
         for func_key in functions_info:
             func_index:FunctionIndex = self.function_resolver.get(func_key)
@@ -229,21 +259,9 @@ class PeekSrcSkill:
         if len(functions_in_scope) == 0:
             return tool_error(f'No functions found in file {file_path} that are in scope! Do not consider it for your investigation.')
 
-        relative_file_path = str(self.function_resolver.get(functions_in_scope[0]).target_container_path).lstrip("/")
-
-        # NOTE: if it does not, something might be wrong with the function resolver or the file
-        # path that are passed to the
-        if not relative_file_path.startswith("src/"):
-            return tool_error(f'The file cannot be found, search somewhere else...')
-
-        # NOTE: change the first occurence of src/ to built_src/
-        #       this is the format we expect and create in the the run.sh scripts.
-        relative_file_path = relative_file_path.replace("src/", "built_src/", 1)
-
-        # NOTE: discoveryGuy can look anywhere (even in paths that are not in scope).
-        #       this is because it doesn't need to modify the files.
-        #       /artifacts/built_src is guaranteed to exists!
-        full_file_path = os.path.join(self.cp.project_path, "artifacts", relative_file_path)
+        full_file_path = self._resolve_source_file_path(functions_in_scope[0])
+        if not full_file_path:
+            return tool_error(f"The file {file_path} could not be resolved under project source {self.project_source}.")
 
         if not os.path.exists(full_file_path):
             return tool_error(f"File {full_file_path} does not exist or it is out of scope.")

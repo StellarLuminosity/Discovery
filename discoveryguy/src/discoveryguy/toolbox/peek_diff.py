@@ -10,7 +10,6 @@ from agentlib.lib import tools
 from pprint import pprint
 from rich import print
 from shellphish_crs_utils.models.indexer import FUNCTION_INDEX_KEY, FunctionIndex
-from shellphish_crs_utils.oss_fuzz.project import OSSFuzzProject
 from shellphish_crs_utils.models.symbols import RelativePathKind
 from shellphish_crs_utils.function_resolver import RemoteFunctionResolver
 from shellphish_crs_utils.models.coverage import FileCoverageMap, FunctionCoverageMap
@@ -102,4 +101,3 @@ class PeekDiffSkill:
                 return tool_success(ALL_TEXT)
             else:
                 return ALL_TEXT
-
