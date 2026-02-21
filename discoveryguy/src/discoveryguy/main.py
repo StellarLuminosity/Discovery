@@ -226,9 +226,10 @@ class DiscoveryGuy:
             self.sarif_resolver = SarifResolver(self.kwargs['sarif'], self.func_resolver)
             self.sarif_assessment_out_path = self.kwargs['sarif_assessment_out_path']
 
-            # Bump up attempts for sarif report exploit gen!
-            Config.exploit_dev_max_attempts_per_sink += 1
-            Config.exploit_dev_max_attempts_regenerate_script += 1
+            # Optional legacy behavior: give SARIF mode an extra attempt.
+            if Config.sarif_bump_attempts:
+                Config.exploit_dev_max_attempts_per_sink += 1
+                Config.exploit_dev_max_attempts_regenerate_script += 1
 
         self.lastest_analysis_report = ""
         # 😴 For nap mode, to keep track of how many naps we have taken
@@ -272,6 +273,8 @@ class DiscoveryGuy:
 
         # Get all the results from the sarif report
         sarif_results = self.sarif_resolver.get_results()
+        if Config.max_sarif_results_to_check > 0:
+            sarif_results = sarif_results[:Config.max_sarif_results_to_check]
 
         for sarif_id, sarif_result in enumerate(sarif_results):
 
@@ -336,6 +339,27 @@ class DiscoveryGuy:
 
         return sariftg_summary, list(all_sarif_sinks)
 
+    def get_sarif_sinks_fast(self) -> List[FUNCTION_INDEX_KEY]:
+        """
+        Lightweight SARIF sink extraction without extra LLM triage.
+        """
+        all_sarif_sinks = []
+        seen = set()
+        sarif_results = self.sarif_resolver.get_results()
+        if Config.max_sarif_results_to_check > 0:
+            sarif_results = sarif_results[:Config.max_sarif_results_to_check]
+
+        for sarif_result in sarif_results:
+            if len(sarif_result.locations) == 0:
+                continue
+            sink_index = sarif_result.locations[0].keyindex
+            if sink_index in seen:
+                continue
+            seen.add(sink_index)
+            all_sarif_sinks.append(sink_index)
+
+        return all_sarif_sinks
+
     def get_ranked_functions(self) -> List[FUNCTION_INDEX_KEY]:
         keys = [item['function_index_key'] for item in self.func_ranking['ranking']]
         ranked_funcs = list(self.func_resolver.find_matching_indices(scope="compiled", indices=keys)[0].values())
@@ -377,6 +401,9 @@ class DiscoveryGuy:
                 # Save the script at the right location
                 with open(script, "wb") as file:
                     payload = exploit_script
+                    # Standalone mode executes directly on host cwd, so normalize
+                    # common container-style output path back to local workspace.
+                    payload = payload.replace("/work/crash.txt", "crash.txt")
                     file.write(payload.encode())
 
                 # 🐍👨🏻‍💻💰⛓️‍💥
@@ -451,6 +478,20 @@ class DiscoveryGuy:
             logger.info(f'✅ Successfully executed the generated Python script')
 
         crash_txt = str(self.sandbox.artifacts_dir_work) + "/crash.txt"
+        if not os.path.exists(crash_txt):
+            fallback_crash_txt = "/work/crash.txt"
+            if os.path.exists(fallback_crash_txt):
+                shutil.copy(fallback_crash_txt, crash_txt)
+            else:
+                logger.warning(
+                    f"Expected crash seed file '{crash_txt}' was not generated."
+                )
+                feedback_for_seed_agent = (
+                    "\nYour script did not produce crash.txt in the working directory. "
+                    "Write the crashing input to crash.txt (relative path), then try again."
+                )
+                return False, False, feedback_for_seed_agent, sandbox_report, exploit_script, ""
+
         for cp in self.crashChecker.cps:
             shutil.copy(crash_txt, str(cp.artifacts_dir_work)+"/pov_input")
 
@@ -685,12 +726,12 @@ class DiscoveryGuy:
         # NOTE: check on why we stop
         try:
             if res.chat_messages[-1].response_metadata:
-                stop_reason = res.chat_messages[-1].response_metadata["finish_reason"]
+                stop_reason = res.chat_messages[-1].response_metadata.get("finish_reason", "unknown")
             else:
                 stop_reason = "max_chats"
 
-        except Exception as e:
-            logger.error("Error getting finish reason from response metadata, assuming 'unknown'.", e)
+        except Exception:
+            logger.exception("Error getting finish reason from response metadata, assuming 'unknown'.")
             stop_reason = "unknown"
 
         if stop_reason == "length":
@@ -1003,8 +1044,14 @@ class DiscoveryGuy:
         #####################################################
         # 🚰 First we are getting the sinks based on the mode
         #####################################################
+        sarif_tg_summary = ""
         if Config.discoveryguy_mode == DiscoverGuyMode.SARIF:
-            sarif_tg_summary, all_sinks = self.get_sarif_triage_summary()
+            if Config.sarif_use_llm_triage:
+                logger.info("🚰 SARIF mode: running SarifTriageGuy before exploit generation.")
+                sarif_tg_summary, all_sinks = self.get_sarif_triage_summary()
+            else:
+                logger.info("🚰 SARIF mode: using fast sink extraction (no SarifTriageGuy LLM triage).")
+                all_sinks = self.get_sarif_sinks_fast()
         elif Config.discoveryguy_mode == DiscoverGuyMode.POISBACKDOOR:
             all_sinks:List[FUNCTION_INDEX_KEY] = self.get_suspicious_funcs()
         elif Config.discoveryguy_mode == DiscoverGuyMode.POIS:
@@ -1015,6 +1062,12 @@ class DiscoveryGuy:
         else:
             logger.critical(" ❌ Invalid DiscoveryGuy mode! ")
             self.exit_and_clean(1)
+
+        if len(all_sinks) > Config.max_pois_to_check:
+            logger.info(
+                f"🚰 Limiting sink checks to top {Config.max_pois_to_check} entries for cost control."
+            )
+            all_sinks = all_sinks[:Config.max_pois_to_check]
 
         # Do we have 🚰 at all?
         if len(all_sinks) == 0:
