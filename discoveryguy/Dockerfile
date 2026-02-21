@@ -30,6 +30,6 @@ COPY --from=libs /libs/debug-lib /shellphish/libs/debug-lib
 RUN pip install --editable /shellphish/libs/debug-lib
 
 # Just create a new folder for shellphish stuff
-COPY ./src /src/
+COPY discoveryguy/src /src/
 
 WORKDIR /src

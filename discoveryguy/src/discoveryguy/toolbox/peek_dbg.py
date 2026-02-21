@@ -12,11 +12,9 @@ from shellphish_crs_utils.models.crs_reports import RootCauseReport
 from agentlib import tools
 from shellphish_crs_utils.models import POIReport
 from shellphish_crs_utils.oss_fuzz.project import OSSFuzzProject
-from crs_telemetry.utils import get_otel_tracer, get_current_span
 from shellphish_crs_utils.function_resolver import LocalFunctionResolver, RemoteFunctionResolver
 
 log = logging.getLogger("peek_dbg")
-tracer = get_otel_tracer()
 
 PeekGDBSkillGlobal = None
 

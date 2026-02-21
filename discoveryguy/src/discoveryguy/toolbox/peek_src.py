@@ -14,7 +14,6 @@ from shellphish_crs_utils.models.indexer import FUNCTION_INDEX_KEY, FunctionInde
 from shellphish_crs_utils.oss_fuzz.project import OSSFuzzProject
 from shellphish_crs_utils.models.symbols import RelativePathKind
 from shellphish_crs_utils.function_resolver import RemoteFunctionResolver
-from analysis_graph.models.cfg import CFGFunction
 from shellphish_crs_utils.models.coverage import FileCoverageMap, FunctionCoverageMap
 
 from .peek_utils import tool_error, tool_success, tool_choice
@@ -115,7 +114,6 @@ class PeekSrcSkill:
 
         self.function_resolver = kwargs["function_resolver"]
         self.function_indices_path = kwargs["function_index"]
-        self.analysis_graph_api = kwargs["analysis_graph_api"]
 
         self.project_source = kwargs["project_source"]
 
@@ -381,7 +379,6 @@ class PeekSrcSkill:
         '''
         Rank matched functions
         '''
-        analysis_graph_alive = True
         tool_call_id = hashlib.md5(f"search_function:{expression}".encode()).hexdigest()
         if tool_call_id in self.last_tool_calls_performed:
             raise RuntimeError(f"You performed the same tool call (with the same arguments!) very recently (less than {self.DUPLICATE_TOOL_CALLS_GUARD_SIZE} calls ago), this might indicate an error in your reasoning. Just reuse the old results and avoid to call this tool again!")
@@ -419,29 +416,11 @@ class PeekSrcSkill:
                     break
 
             if maybe_global:
-                try:
-                    res = self.analysis_graph_api.get_global_variable_usage(filename)
-                except Exception as e:
-                    log.warning(f"Error getting global variable usage for {filename}: {e}")
-                    analysis_graph_alive = False
-                    # FIXME: is this exception caught by agentlib or this is allowed?
-                    res = []
-                if analysis_graph_alive == True:
-                    if len(res) > 0:
-                        global_id = f"{filename}:{line}"
-                        # global_vars = do_grep(10, self.project_source, expression)
-                        global_vars = show_lines(self.project_source, filename, line, 10)
-                        matched_variables[global_id] = global_vars
-                    else:
-                        # If no global variables are found, we can still grep the file
-                        # to find any other matches that are not functions or globals.
-                        matched_id = f"{filename}:{line}"
-                        matched_vars = show_lines(self.project_source, filename, line, 1)
-                        matched_variables[matched_id] = matched_vars
-                else:
-                    global_id = f"{filename}:{line}"
+                global_id = f"{filename}:{line}"
+                global_vars = show_lines(self.project_source, filename, line, 10)
+                if not global_vars:
                     global_vars = do_grep(10, self.project_source, expression)
-                    matched_variables[global_id] = global_vars
+                matched_variables[global_id] = global_vars
 
         log.info(f"Matched {len(matched_function_index)} functions and {len(matched_variables)} global variables for expression: {expression}")
         function_code = ""

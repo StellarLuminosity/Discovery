@@ -1,0 +1,4 @@
+# DiscoveryGuy now runs standalone via `python discoveryguy/src/standalone_run.py`.
+# This placeholder keeps legacy pipeline imports from failing on missing files.
+repos: {}
+jobs: {}

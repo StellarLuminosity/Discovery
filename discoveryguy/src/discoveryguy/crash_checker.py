@@ -1,13 +1,11 @@
 import subprocess
 import os
-import random
 import logging
 
 from rich import print
 from .config import Config
 from .suppress import maybe_suppress_output
 
-from shellphish_crs_utils.oss_fuzz.project import OSSFuzzProject
 # from ..exceptions.errors import PatchedCodeStillCrashes
 
 logger = logging.getLogger(__name__)

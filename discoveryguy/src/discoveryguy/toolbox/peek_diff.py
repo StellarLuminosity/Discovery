@@ -2,7 +2,10 @@ import os
 import json
 import logging
 import hashlib
-import whatthepatch
+try:
+    import whatthepatch
+except Exception:
+    whatthepatch = None
 from agentlib.lib import tools
 from pprint import pprint
 from rich import print
@@ -10,7 +13,6 @@ from shellphish_crs_utils.models.indexer import FUNCTION_INDEX_KEY, FunctionInde
 from shellphish_crs_utils.oss_fuzz.project import OSSFuzzProject
 from shellphish_crs_utils.models.symbols import RelativePathKind
 from shellphish_crs_utils.function_resolver import RemoteFunctionResolver
-from analysis_graph.models.cfg import CFGFunction
 from shellphish_crs_utils.models.coverage import FileCoverageMap, FunctionCoverageMap
 import re
 log = logging.getLogger("discoveryguy.peek_diff")
@@ -42,6 +44,8 @@ def get_diff_snippet(function_index: str):
 
 class PeekDiffSkill:
     def __init__(self, **kwargs):
+        if whatthepatch is None:
+            raise RuntimeError("whatthepatch is required for diff mode but is not installed")
         self.func_resolver = kwargs["func_resolver"]
         self.changed_func_resolver = kwargs["changed_func_resolver"]
         self.diff_file = kwargs["diff_file"]
@@ -98,6 +102,4 @@ class PeekDiffSkill:
                 return tool_success(ALL_TEXT)
             else:
                 return ALL_TEXT
-
-
 

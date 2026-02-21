@@ -12,7 +12,6 @@ from shellphish_crs_utils.models.indexer import FUNCTION_INDEX_KEY, FunctionInde
 from shellphish_crs_utils.oss_fuzz.project import OSSFuzzProject
 from shellphish_crs_utils.models.symbols import RelativePathKind
 from shellphish_crs_utils.function_resolver import RemoteFunctionResolver
-from analysis_graph.models.cfg import CFGFunction
 from shellphish_crs_utils.models.coverage import FileCoverageMap, FunctionCoverageMap
 from shellphish_crs_utils.utils import safe_decode_string
 
