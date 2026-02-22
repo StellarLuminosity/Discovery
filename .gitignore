@@ -1,4 +1,5 @@
 .venv/
+report/
 CLAUDE.md
 discoveryguy/src/discoveryguy/agents/__pycache__/
 discoveryguy/src/discoveryguy/toolbox/__pycache__/
