@@ -1,0 +1,7 @@
+import cpp
+
+from TypedefType tt 
+where tt.getName() = "{{ typedef_name }}"   
+select
+  tt.getName() as col1,
+  tt.getUnderlyingType().toString() as col2

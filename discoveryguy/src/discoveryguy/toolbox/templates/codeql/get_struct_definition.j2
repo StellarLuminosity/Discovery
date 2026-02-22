@@ -1,0 +1,10 @@
+import cpp
+
+from Struct structType, Variable field
+where 
+    structType.getName() = "{{ struct_name }}" and
+    field = structType.getAField()
+select
+  structType.getName() as structType,
+  field.getType().toString() + " " + field.getName() + ";" as col2
+       
