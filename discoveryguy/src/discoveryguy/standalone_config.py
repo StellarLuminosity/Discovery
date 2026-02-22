@@ -97,7 +97,12 @@ ACTIVE_CONFIG = StandaloneConfig(
 
         sarif="/home/mark/Projects/Discovery/discoveryguy/local_artifacts/dvcp/results.sarif",
         sarif_meta="/home/mark/Projects/Discovery/discoveryguy/local_artifacts/dvcp/sarif_meta.yaml",
-        sarif_assessment_out_path="/home/mark/Projects/Discovery/discoveryguy/standalone_outputs/dvcp-local/reports/sarif_assessment.json",
+        sarif_assessment_out_path="/home/mark/Projects/Discovery/report/sarif_assessment.json",
+        report_dir="/home/mark/Projects/Discovery/report",
+        backup_seeds_vault="/home/mark/Projects/Discovery/report/seed_backup",
+        fuzzers_sync_base="/home/mark/Projects/Discovery/report/fuzzer_sync",
+        crash_dir_pass_to_pov="/home/mark/Projects/Discovery/report/pov_crashes",
+        crash_metadata_dir_pass_to_pov="/home/mark/Projects/Discovery/report/pov_crash_meta",
         
         # Optional: path to CodeQL DB archive (.zip/.tar.gz) or a directory containing one.
         # codeql_db_path="/abs/path/to/sss-codeql-database.zip",
