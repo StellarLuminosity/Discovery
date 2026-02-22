@@ -122,6 +122,10 @@ class BaseRunnable(BaseLogger, Runnable[Input, Output]):
 
         mn, co = v
 
+        # Agent/framework flags should not be forwarded to provider SDKs.
+        kwargs.pop("use_loggers", None)
+        kwargs.pop("use_logging", None)
+
         model_kwargs = dict(
             raise_on_budget_exception=kwargs.pop('raise_on_budget_exception', True),
             raise_on_rate_limit_exception=kwargs.pop('raise_on_rate_limit_exception', False),
@@ -533,4 +537,3 @@ class ContinueConversationException(Exception):
     To make use of this feature use an AgentWithHistory subclass.
     """
     pass
-

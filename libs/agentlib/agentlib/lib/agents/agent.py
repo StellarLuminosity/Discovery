@@ -557,6 +557,13 @@ class LLMFunction(RunnableLocalObject[Input, Output]):
     ):
         cls_context: BaseRunnable = function_owner or cls
 
+        # Backward-compatibility alias used in this codebase; prevent it from
+        # leaking into provider kwargs where it can break SDK calls.
+        if "use_loggers" in llm_args:
+            if not use_logging:
+                use_logging = bool(llm_args["use_loggers"])
+            llm_args.pop("use_loggers", None)
+
         prompt = cls.convert_prompt_into_chat_template(prompt, cls_context, model=model)
 
         output_parser = cls.get_output_parser(output, llm_args)
