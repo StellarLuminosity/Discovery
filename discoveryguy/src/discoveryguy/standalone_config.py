@@ -95,8 +95,8 @@ ACTIVE_CONFIG = StandaloneConfig(
         target_functions_jsons_dir="/home/mark/Projects/Discovery/discoveryguy/local_artifacts/dvcp/functions_jsons",
         function_ranking="/home/mark/Projects/Discovery/discoveryguy/local_artifacts/dvcp/function_ranking.yaml",
 
-        # sarif="/abs/path/to/results.sarif",
-        # sarif_meta="/abs/path/to/sarif_meta.yaml",
+        sarif="/home/mark/Projects/Discovery/discoveryguy/local_artifacts/dvcp/results.sarif",
+        sarif_meta="/home/mark/Projects/Discovery/discoveryguy/local_artifacts/dvcp/sarif_meta.yaml",
         sarif_assessment_out_path="/home/mark/Projects/Discovery/discoveryguy/standalone_outputs/dvcp-local/reports/sarif_assessment.json",
         
         # Optional: path to CodeQL DB archive (.zip/.tar.gz) or a directory containing one.
@@ -106,7 +106,7 @@ ACTIVE_CONFIG = StandaloneConfig(
         mode="SARIF",
         low_cost_mode=True,
         local_run=True,
-        use_codeql_server=True,
+        use_codeql_server=False,
         max_pois_to_check=3,
         max_sarif_results_to_check=3,
         exploit_attempts_per_sink=1,
@@ -116,8 +116,8 @@ ACTIVE_CONFIG = StandaloneConfig(
         jimmypwn_max_tool_iterations=40,
         jimmypwn_max_tokens=4096,
         enable_codeql_tools_for_jimmypwn=False,
-        jimmypwn_models=["gpt-o4-mini", "o3"],
-        summary_models=["o3", "gpt-o4-mini"],
-        honey_select_models=["o3", "gpt-o4-mini"],
+        jimmypwn_models=["o4-mini", "claude-4-sonnet"],
+        summary_models=["gpt-4o-mini"],
+        honey_select_models=["gpt-4o-mini"],
     ),
 )
