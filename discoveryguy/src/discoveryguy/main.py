@@ -339,6 +339,98 @@ class DiscoveryGuy:
 
         return sariftg_summary, list(all_sarif_sinks)
 
+    def get_rule_based_triage(self) -> List[FUNCTION_INDEX_KEY]:
+        """
+        Rule-based SARIF function triage by sink.
+        """
+        per_sink_best = {}
+
+        # Parse SARIF
+        sarif_results = self.sarif_resolver.get_results()
+        if Config.max_sarif_results_to_check > 0:
+            sarif_results = sarif_results[:Config.max_sarif_results_to_check]
+
+        for sarif_result in sarif_results:
+            if len(sarif_result.locations) == 0:
+                continue
+            
+            score = 0
+            sink_loc = sarif_result.locations[0]
+            sink_key = sink_loc.keyindex
+
+            # 1) Extract Features
+            rule_id = sarif_result.rule_id
+            message = sarif_result.message or ""
+            sarif_rule = sarif_result.sarif_rule
+            codeflows = sarif_result.codeflows
+            locations = sarif_result.related_locations
+
+            severity = sarif_rule.severity
+            security_severity = sarif_rule.security_severity
+            problem_severity = sarif_rule.problem.severity
+            
+            # 2) Score by reachability
+            reachability_score = 0
+            if codeflows:
+                reachability_score += 1 # honestly, not sure here and below about what scores to add for each
+                if len(codeflows) < 6:
+                    reachability_score += 3
+                elif 6 <= len(codeflows) < 11:
+                    reachability_score += 2
+                if "main" or Config.harness_function_name in codeflows:
+                    reachability_score += 2
+
+            # 3) Score by Sink type 
+            sink_type_score = 0   
+            if "free" or "pointer" in rule_id:
+                sink_type_score =+ 5 # memory corruption
+            if "injection" in rule_id:
+                sink_type_score += 4 # security issue
+            # more classes + otherwise it's style maintenability
+
+            if severity == "error":
+                sink_type_score += 5 
+            elif severity == "warning":
+                sink_type_score += 1
+            # if "note" or "none" - ignore
+
+            sink_type_score += security_severity
+
+            # 4) Score external input
+            external_score = 0
+            text_hits = [for keyword in message if keyword in (argv, file, fopen, recv, socket, parse, decode, load)]
+
+            # a bit confused about this - what are we checking here:
+            #     func_name_hits = keywords in:
+            #         each codeflow location.func
+            #         each related location.func
+            # 
+            #     file_name_hits = keywords in:
+            #         each codeflow location.file
+            #         each related location.file
+
+            external_score += text_hits + func_name_hits
+
+            # 5) weigh scores
+            score = reachability_score * 3 + sink_type_score * 5 + external_score * 2 # not sure how I should weigh it
+
+            # 6) Save sink key
+            # Confused about this - why are we aggregating and replacing rather than just adding sink + score to list and then taking the top k?
+            # if sink_key not in per_sink_best:
+            #     store this result as best for sink
+            # else:
+            #     if total_score > existing best score:
+            #         replace best
+            #     else:
+            #         maybe keep count/metadata (optional)
+
+        # 6) Rank sinks
+        ranked_keys = {k: v for k, v in sorted(per_sink_best.values())}
+   
+        return ranked_keys
+
+
+
     def get_sarif_sinks_fast(self) -> List[FUNCTION_INDEX_KEY]:
         """
         Lightweight SARIF sink extraction without extra LLM triage.
@@ -1049,6 +1141,9 @@ class DiscoveryGuy:
             if Config.sarif_use_llm_triage:
                 logger.info("🚰 SARIF mode: running SarifTriageGuy before exploit generation.")
                 sarif_tg_summary, all_sinks = self.get_sarif_triage_summary()
+            elif Config.use_rule_triage:
+                logger.info("🚰 SARIF mode: using rule-based SARIF triage.")
+                all_sinks = self.get_rule_based_triage()
             else:
                 logger.info("🚰 SARIF mode: using fast sink extraction (no SarifTriageGuy LLM triage).")
                 all_sinks = self.get_sarif_sinks_fast()
