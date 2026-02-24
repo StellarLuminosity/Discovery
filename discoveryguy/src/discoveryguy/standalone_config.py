@@ -52,10 +52,11 @@ class StandaloneRuntimeConfig:
     skip_already_pwned: bool = False
     # Cost/throughput knobs.
     max_pois_to_check: int = 3
-    max_sarif_results_to_check: int = 3
+    max_sarif_results_to_check: int = 0
     exploit_attempts_per_sink: int = 1
     seed_regen_attempts: int = 1
     sarif_use_llm_triage: bool = False
+    use_rule_triage: bool = True
     sarif_bump_attempts: bool = False
     jimmypwn_max_tool_iterations: int = 40
     jimmypwn_max_tokens: int = 4096
@@ -117,6 +118,7 @@ ACTIVE_CONFIG = StandaloneConfig(
         exploit_attempts_per_sink=1,
         seed_regen_attempts=1,
         sarif_use_llm_triage=False,
+        use_rule_triage=True,
         sarif_bump_attempts=False,
         jimmypwn_max_tool_iterations=40,
         jimmypwn_max_tokens=4096,
