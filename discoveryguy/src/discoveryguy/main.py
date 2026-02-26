@@ -344,6 +344,9 @@ class DiscoveryGuy:
         Rule-based SARIF function triage by sink.
         """
         per_sink_best = {}
+        keywords = ("argv", "file", "fopen", "recv", "socket", "parse", "decode", "load")
+        high_list = ["use-after-free", "double-free", "invalid-pointer-deref"]
+        med_list = ["injection", "format-string"]
 
         # Parse SARIF
         sarif_results = self.sarif_resolver.get_results()
@@ -354,45 +357,47 @@ class DiscoveryGuy:
             if len(sarif_result.locations) == 0:
                 continue
             
-            score = 0
+            reachability_score = 0
+            external_score = 0
+            sink_type_score = 0
+            severity_score = 0
+
+            # 1) Extract Features
             sink_loc = sarif_result.locations[0]
             sink_key = sink_loc.keyindex
 
-            # 1) Extract Features
             rule_id = sarif_result.rule_id
             message = sarif_result.message or ""
             sarif_rule = sarif_result.sarif_rule
             codeflow = sarif_result.codeflows
-            locations = sarif_result.related_locations
+            related_locations = sarif_result.related_locations
+                
+            # 2) Reachability
+            if codeflow:
+                reachability_score += 1 # base score
+                if len(codeflow.locations) < 6:
+                    reachability_score += 3
+                elif 6 <= len(codeflow.locations) <= 10:
+                    reachability_score += 2
+            
+            # 3) External input
+            external_score = sum(1 for loc in codeflow.locations if loc.message and any(kw in loc.message for kw in keywords))
+            external_score += 0.5 * related_locations
 
+            # 4) Sink type
+            if any(item in rule_id for item in high_list):
+                sink_type_score += 5
+            if any(item in rule_id for item in med_list):
+                sink_type_score += 4
+
+            # 4) Score by severity
             if sarif_rule:
                 severity = sarif_rule.severity
                 security_severity = sarif_rule.security_severity
                 precision = sarif_rule.precision
                 tags = sarif_rule.tags
-                
-                # 2) Score by reachability
-                reachability_score = 0
-                if codeflow:
-                    reachability_score += 1 # base score
-                    if len(codeflow.locations) < 6:
-                        reachability_score += 3
-                    elif 6 <= len(codeflow.locations) <= 10:
-                        reachability_score += 2
 
-                # 3) Score by sink type
-                sink_type_score = 0   
-                high_list = ["use-after-free", "double-free", "invalid-pointer-deref"]
-                med_list = ["injection", "format-string"]
-                if any(item in rule_id for item in high_list):
-                    sink_type_score += 5 # memory corruption
-                if any(item in rule_id for item in med_list):
-                    sink_type_score += 4 # security issue
-                # more classes + otherwise it's style maintenability
-
-                # 4) Score by severity
-                severity_score = 0
-                if "cwe" in tags:
+                if any("cwe" in tag for tag in tags):
                     sink_type_score += 3
 
                 if precision == "very-high":
@@ -401,40 +406,33 @@ class DiscoveryGuy:
                     severity_score += 3
                 
                 if severity == "error":
-                    severity_score += 5 
+                    severity_score += 5
                 elif severity == "warning":
                     severity_score += 3
-                elif severity == "note" or "none":
+                elif severity in ("note", "none"):
                     continue # not serious
 
-                severity_score += float(security_severity)
-
-                # 5) Score external input
-                external_score = 0
-                text_hits = [for loc in codeflow.locations if loc in (argv, file, fopen, recv, socket, parse, decode, load)]
-
-                external_score += text_hits
-
-                # 6) weigh scores
-                score = sink_type_score * 5 + severity_score * 5 + reachability_score * 3 + external_score * 1
+                if security_severity is not None:
+                    severity_score += float(security_severity) * 0.5
             else:
-                # 7) fallback scoring
-                text_hits = [text in message if text in ("argv", "file", "fopen", "recv", "socket", "parse", "decode", "load")]
+                # fallback scoring
+                severity_score = sum(1 for kw in message if kw in keywords)
 
-            # 8) Save sink key
-            # Confused about this - 
-            # instead of aggregating and replacing function (i.e. sink key) with the highest score
-            # shouldn't we add to the score if another sink problem was found in that function 
-            # if sink_key not in per_sink_best:
-            #     store this result as best for sink
-            # else:
-            #     if total_score > existing best score:
-            #         replace best
-            #     else:
-            #         maybe keep count/metadata (optional)
+            # 5) weigh scores
+            sum_score = sink_type_score * 5 + severity_score * 4 + reachability_score * 2 + external_score * 3
 
-        # 6) Rank sinks
-        ranked_keys = {k: v for k, v in sorted(per_sink_best.values())}
+            # 6) Save sink key
+            kkey = per_sink_best.get(sink_key)
+            if kkey is None: # add new key
+                per_sink_best[sink_key] = {"score": sum_score, "count": 1, "best_rule": rule_id}
+            elif sum_score > kkey["score"]: # key exists, only update if best score
+                    sum_score = sum_score + (kkey["count"] - 1) * 2
+                    kkey["score"] = sum_score
+                    kkey["count"] += rule_id
+                    kkey["best_rule"] = rule_id
+
+        # 7) Rank sinks
+        ranked_keys = [k for k, v in sorted(iterable=per_sink_best.items(), key=lambda x: x[1]["score"], reverse=True)]
    
         return ranked_keys
 
