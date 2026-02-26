@@ -426,27 +426,26 @@ class DiscoveryGuy:
 
                 if security_severity is not None:
                     severity_score += float(security_severity)
+            else:
+                # No rule metadata: fallback
+                severity_score = sum(1 for kw in keywords if kw in message)
 
             # 5) weigh scores
             sum_score = sink_type_score * 5 + severity_score * 4 + external_score * 4 + reachability_score * 2
 
             # 6) Save sink key
             kkey = per_sink_best.get(sink_key)
+
             if kkey is None: # add new key
-                per_sink_best[sink_key] = {"score": sum_score, "count": 1, "best_rule": rule_id}
+                per_sink_best[sink_key] = {"score": sum_score, "count": 1}
             else:
                 kkey["count"] += 1
-                kkey["score"] += 2  # bonus for repeat finding
-                if sum_score > kkey["score"]:
-                    sum_score = sum_score + (kkey["count"] - 1) * 2
-                    kkey["score"] = sum_score
-                    kkey["best_rule"] = rule_id
+                kkey["score"] += sum_score * 0.3
 
         # 7) Rank sinks
         ranked_keys = [k for k, v in sorted(per_sink_best.items(), key=lambda x: x[1]["score"], reverse=True)]
    
         return ranked_keys
-
 
 
     def get_sarif_sinks_fast(self) -> List[FUNCTION_INDEX_KEY]:
