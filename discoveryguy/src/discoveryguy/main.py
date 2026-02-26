@@ -365,64 +365,66 @@ class DiscoveryGuy:
             codeflow = sarif_result.codeflows
             locations = sarif_result.related_locations
 
-            severity = sarif_rule.severity
-            security_severity = sarif_rule.security_severity
-            precision = sarif_rule.precision
-            tags = sarif_rule.tags
-            
-            # 2) Score by reachability
-            reachability_score = 0
-            if codeflow:
-                reachability_score += 1 # base score
-                if len(codeflow.locations) < 6:
-                    reachability_score += 3
-                elif 6 <= len(codeflow.locations) <= 10:
-                    reachability_score += 2
+            if sarif_rule:
+                severity = sarif_rule.severity
+                security_severity = sarif_rule.security_severity
+                precision = sarif_rule.precision
+                tags = sarif_rule.tags
+                
+                # 2) Score by reachability
+                reachability_score = 0
+                if codeflow:
+                    reachability_score += 1 # base score
+                    if len(codeflow.locations) < 6:
+                        reachability_score += 3
+                    elif 6 <= len(codeflow.locations) <= 10:
+                        reachability_score += 2
 
-            # 3) Score by sink type
-            sink_type_score = 0   
-            high_list = ["use-after-free", "double-free", "invalid-pointer-deref"]
-            med_list = ["injection", "format-string"]
-            if any(item in rule_id for item in high_list):
-                sink_type_score += 5 # memory corruption
-            if any(item in rule_id for item in med_list):
-                sink_type_score += 4 # security issue
-            # more classes + otherwise it's style maintenability
+                # 3) Score by sink type
+                sink_type_score = 0   
+                high_list = ["use-after-free", "double-free", "invalid-pointer-deref"]
+                med_list = ["injection", "format-string"]
+                if any(item in rule_id for item in high_list):
+                    sink_type_score += 5 # memory corruption
+                if any(item in rule_id for item in med_list):
+                    sink_type_score += 4 # security issue
+                # more classes + otherwise it's style maintenability
 
-            # 4) Score by severity
-            severity_score = 0
-            if "cwe" in tags:
-                sink_type_score += 3
+                # 4) Score by severity
+                severity_score = 0
+                if "cwe" in tags:
+                    sink_type_score += 3
 
-            if severity == "error":
-                sink_type_score += 5 
-            elif severity == "warning":
-                sink_type_score += 3
-            elif severity == "note" or "none":
-                continue # not serious
+                if precision == "very-high":
+                    severity_score += 5
+                elif precision == "high":
+                    severity_score += 3
+                
+                if severity == "error":
+                    severity_score += 5 
+                elif severity == "warning":
+                    severity_score += 3
+                elif severity == "note" or "none":
+                    continue # not serious
 
-            sink_type_score += float(security_severity)
+                severity_score += float(security_severity)
 
-            # 5) Score external input
-            external_score = 0
-            text_hits = [for keyword in message if keyword in (argv, file, fopen, recv, socket, parse, decode, load)]
+                # 5) Score external input
+                external_score = 0
+                text_hits = [for loc in codeflow.locations if loc in (argv, file, fopen, recv, socket, parse, decode, load)]
 
-            # a bit confused about this - what are we checking here:
-            #     func_name_hits = keywords in:
-            #         each codeflow location.func
-            #         each related location.func
-            # 
-            #     file_name_hits = keywords in:
-            #         each codeflow location.file
-            #         each related location.file
+                external_score += text_hits
 
-            external_score += text_hits + func_name_hits
+                # 6) weigh scores
+                score = sink_type_score * 5 + severity_score * 5 + reachability_score * 3 + external_score * 1
+            else:
+                # 7) fallback scoring
+                text_hits = [text in message if text in ("argv", "file", "fopen", "recv", "socket", "parse", "decode", "load")]
 
-            # 6) weigh scores
-            score = reachability_score * 3 + sink_type_score * 5 + external_score * 2 # not sure how I should weigh it
-
-            # 7) Save sink key
-            # Confused about this - why are we aggregating and replacing rather than just adding sink + score to list and then taking the top k?
+            # 8) Save sink key
+            # Confused about this - 
+            # instead of aggregating and replacing function (i.e. sink key) with the highest score
+            # shouldn't we add to the score if another sink problem was found in that function 
             # if sink_key not in per_sink_best:
             #     store this result as best for sink
             # else:
