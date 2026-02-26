@@ -362,41 +362,48 @@ class DiscoveryGuy:
             rule_id = sarif_result.rule_id
             message = sarif_result.message or ""
             sarif_rule = sarif_result.sarif_rule
-            codeflows = sarif_result.codeflows
+            codeflow = sarif_result.codeflows
             locations = sarif_result.related_locations
 
             severity = sarif_rule.severity
             security_severity = sarif_rule.security_severity
-            problem_severity = sarif_rule.problem.severity
+            precision = sarif_rule.precision
+            tags = sarif_rule.tags
             
             # 2) Score by reachability
             reachability_score = 0
-            if codeflows:
-                reachability_score += 1 # honestly, not sure here and below about what scores to add for each
-                if len(codeflows) < 6:
+            if codeflow:
+                reachability_score += 1 # base score
+                if len(codeflow.locations) < 6:
                     reachability_score += 3
-                elif 6 <= len(codeflows) < 11:
-                    reachability_score += 2
-                if "main" or Config.harness_function_name in codeflows:
+                elif 6 <= len(codeflow.locations) <= 10:
                     reachability_score += 2
 
-            # 3) Score by Sink type 
+            # 3) Score by sink type
             sink_type_score = 0   
-            if "free" or "pointer" in rule_id:
-                sink_type_score =+ 5 # memory corruption
-            if "injection" in rule_id:
+            high_list = ["use-after-free", "double-free", "invalid-pointer-deref"]
+            med_list = ["injection", "format-string"]
+            if any(item in rule_id for item in high_list):
+                sink_type_score += 5 # memory corruption
+            if any(item in rule_id for item in med_list):
                 sink_type_score += 4 # security issue
             # more classes + otherwise it's style maintenability
+
+            # 4) Score by severity
+            severity_score = 0
+            if "cwe" in tags:
+                sink_type_score += 3
 
             if severity == "error":
                 sink_type_score += 5 
             elif severity == "warning":
-                sink_type_score += 1
-            # if "note" or "none" - ignore
+                sink_type_score += 3
+            elif severity == "note" or "none":
+                continue # not serious
 
-            sink_type_score += security_severity
+            sink_type_score += float(security_severity)
 
-            # 4) Score external input
+            # 5) Score external input
             external_score = 0
             text_hits = [for keyword in message if keyword in (argv, file, fopen, recv, socket, parse, decode, load)]
 
@@ -411,10 +418,10 @@ class DiscoveryGuy:
 
             external_score += text_hits + func_name_hits
 
-            # 5) weigh scores
+            # 6) weigh scores
             score = reachability_score * 3 + sink_type_score * 5 + external_score * 2 # not sure how I should weigh it
 
-            # 6) Save sink key
+            # 7) Save sink key
             # Confused about this - why are we aggregating and replacing rather than just adding sink + score to list and then taking the top k?
             # if sink_key not in per_sink_best:
             #     store this result as best for sink
