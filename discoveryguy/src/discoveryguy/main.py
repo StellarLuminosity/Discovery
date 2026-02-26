@@ -370,7 +370,6 @@ class DiscoveryGuy:
             message = sarif_result.message or ""
             sarif_rule = sarif_result.sarif_rule
             codeflow = sarif_result.codeflows
-            related_locations = sarif_result.related_locations
                 
             # 2) Reachability
             if codeflow:
@@ -380,10 +379,9 @@ class DiscoveryGuy:
                 elif 6 <= len(codeflow.locations) <= 10:
                     reachability_score += 2
             
-            # 3) External input
-            external_score = sum(1 for loc in codeflow.locations if loc.message and any(kw in loc.message for kw in keywords))
-            external_score += 0.5 * related_locations
-
+                # 3) External input
+                external_score = sum(1 for loc in codeflow.locations if loc.message and any(kw in loc.message for kw in keywords))
+            
             # 4) Sink type
             if any(item in rule_id for item in high_list):
                 sink_type_score += 5
