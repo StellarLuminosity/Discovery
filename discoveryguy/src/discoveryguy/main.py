@@ -362,27 +362,33 @@ class DiscoveryGuy:
             sink_type_score = 0
             severity_score = 0
 
-            # 1) Extract Features
             sink_loc = sarif_result.locations[0]
             sink_key = sink_loc.keyindex
-
             rule_id = sarif_result.rule_id
             message = sarif_result.message or ""
             sarif_rule = sarif_result.sarif_rule
             codeflow = sarif_result.codeflows
                 
-            # 2) Reachability
+            # 1) Reachability
             if codeflow:
-                reachability_score += 1 # base score
-                if len(codeflow.locations) < 6:
+                reachability_score += 1
+                n = len(codeflow.locations)
+                if n < 6:
                     reachability_score += 3
-                elif 6 <= len(codeflow.locations) <= 10:
+                elif n <= 10:
                     reachability_score += 2
+                # > 10: no bonus, long paths are often false positives
             
-                # 3) External input
-                external_score = sum(1 for loc in codeflow.locations if loc.message and any(kw in loc.message for kw in keywords))
+            # 2) External input
+            if codeflow:
+                external_score = sum(
+                    1 for loc in codeflow.locations 
+                    if loc.message and any(kw in loc.message for kw in keywords)
+                )
+            else:
+                external_score = sum(1 for kw in keywords if kw in message)
             
-            # 4) Sink type
+            # 3) Sink type
             if any(item in rule_id for item in high_list):
                 sink_type_score += 5
             if any(item in rule_id for item in med_list):
@@ -394,30 +400,35 @@ class DiscoveryGuy:
                 security_severity = sarif_rule.security_severity
                 precision = sarif_rule.precision
                 tags = sarif_rule.tags
+                kind = sarif_rule.kind
+
+                if severity in ("note", "none", "recommendation"):
+                    continue
 
                 if any("cwe" in tag for tag in tags):
                     sink_type_score += 3
+            
+                # path-problem with codeflow = higher confidence finding
+                if kind == "path-problem" and codeflow:
+                    reachability_score += 3
 
                 if precision == "very-high":
                     severity_score += 5
                 elif precision == "high":
                     severity_score += 3
+                elif precision == "medium":
+                    severity_score += 1
                 
                 if severity == "error":
                     severity_score += 5
                 elif severity == "warning":
                     severity_score += 3
-                elif severity in ("note", "none"):
-                    continue # not serious
 
                 if security_severity is not None:
-                    severity_score += float(security_severity) * 0.5
-            else:
-                # fallback scoring
-                severity_score = sum(1 for kw in keywords if kw in message)
+                    severity_score += float(security_severity)
 
             # 5) weigh scores
-            sum_score = sink_type_score * 5 + severity_score * 4 + reachability_score * 2 + external_score * 3
+            sum_score = sink_type_score * 5 + severity_score * 4 + external_score * 4 + reachability_score * 2
 
             # 6) Save sink key
             kkey = per_sink_best.get(sink_key)
@@ -429,7 +440,6 @@ class DiscoveryGuy:
                 if sum_score > kkey["score"]:
                     sum_score = sum_score + (kkey["count"] - 1) * 2
                     kkey["score"] = sum_score
-                    kkey["count"] += 1
                     kkey["best_rule"] = rule_id
 
         # 7) Rank sinks
