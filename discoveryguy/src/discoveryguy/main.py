@@ -414,7 +414,7 @@ class DiscoveryGuy:
                     severity_score += float(security_severity) * 0.5
             else:
                 # fallback scoring
-                severity_score = sum(1 for kw in message if kw in keywords)
+                severity_score = sum(1 for kw in keywords if kw in message)
 
             # 5) weigh scores
             sum_score = sink_type_score * 5 + severity_score * 4 + reachability_score * 2 + external_score * 3
@@ -423,14 +423,17 @@ class DiscoveryGuy:
             kkey = per_sink_best.get(sink_key)
             if kkey is None: # add new key
                 per_sink_best[sink_key] = {"score": sum_score, "count": 1, "best_rule": rule_id}
-            elif sum_score > kkey["score"]: # key exists, only update if best score
+            else:
+                kkey["count"] += 1
+                kkey["score"] += 2  # bonus for repeat finding
+                if sum_score > kkey["score"]:
                     sum_score = sum_score + (kkey["count"] - 1) * 2
                     kkey["score"] = sum_score
-                    kkey["count"] += rule_id
+                    kkey["count"] += 1
                     kkey["best_rule"] = rule_id
 
         # 7) Rank sinks
-        ranked_keys = [k for k, v in sorted(iterable=per_sink_best.items(), key=lambda x: x[1]["score"], reverse=True)]
+        ranked_keys = [k for k, v in sorted(per_sink_best.items(), key=lambda x: x[1]["score"], reverse=True)]
    
         return ranked_keys
 
